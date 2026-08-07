@@ -1,0 +1,52 @@
+# Binaries
+*.exe
+*.dll
+*.so
+*.dylib
+entangled-server*
+entangled-client*
+
+# Build output (do not ignore client/frontend/dist — go:embed needs it tracked)
+build/bin/
+build/
+client/build/
+# Node
+node_modules/
+**/node_modules/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vs/
+.vscode/
+.idea/
+*.sln
+*.suo
+
+# Temp / local
+*.log
+*.tmp
+__pycache__/
+*.pyc
+noise_b64.txt
+rooms.json
+query
+
+# Secrets & private deploy
+*.pem
+*.key
+id_rsa*
+id_ed25519*
+server ssh connect/
+deploy-server.py
+deploy-commands.txt
+_diag.py
+check_relay_logs.py
+check_server_logs.py
+.env
+.env.*
+
+# Dead / unused tree
+/frontend/
