@@ -1,6 +1,7 @@
 # Binaries
 *.exe
 *.dll
+!client/vpncore/native/wintun.dll
 *.so
 *.dylib
 entangled-server*

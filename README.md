@@ -109,9 +109,9 @@ App version constant: `client/vpncore/version.go` (`AppVersion`).
 
 ## Releases
 
-Windows client builds ship as a zip with **`Entangled.exe` + `wintun.dll`** (required next to the exe). Run as Administrator.
+**Windows client:** download **`Entangled.exe`** from the [GitHub Release](https://github.com/Warexpor/EntangledVPN/releases) and run it **as Administrator**. Wintun is embedded — the first launch writes `wintun.dll` next to the exe (leave that file there).
 
-Server binaries are attached to the same GitHub Release when published.
+Server binaries (`entangled-server-linux-amd64`, `entangled-server-windows-amd64.exe`) are on the same Release.
 
 ## License
 

@@ -1,6 +1,9 @@
+//go:build windows
+
 package vpncore
 
 import (
+	_ "embed"
 	"fmt"
 	"log"
 	"net"
@@ -12,45 +15,33 @@ import (
 	"golang.zx2c4.com/wintun"
 )
 
+//go:embed native/wintun.dll
+var embeddedWintunDLL []byte
+
 func init() {
 	ensureWintunDLL()
 }
 
+// ensureWintunDLL writes the embedded driver next to the exe if missing.
+// Consumers only download Entangled.exe; first run creates wintun.dll beside it.
 func ensureWintunDLL() {
 	exe, err := os.Executable()
 	if err != nil {
 		return
 	}
-	exeDir := filepath.Dir(exe)
-	dllPath := filepath.Join(exeDir, "wintun.dll")
+	dllPath := filepath.Join(filepath.Dir(exe), "wintun.dll")
 	if _, err := os.Stat(dllPath); err == nil {
 		return
 	}
-	candidates := []string{
-		filepath.Join(exeDir, "..", "..", "build", "windows", "wintun.dll"),
-		filepath.Join(exeDir, "..", "build", "windows", "wintun.dll"),
-		filepath.Join(exeDir, "..", "wintun.dll"),
-		"build/windows/wintun.dll",
-		"../build/windows/wintun.dll",
-		"../../build/windows/wintun.dll",
+	if len(embeddedWintunDLL) == 0 {
+		log.Printf("Warning: embedded wintun.dll is empty")
+		return
 	}
-	for _, src := range candidates {
-		srcPath, err := filepath.Abs(src)
-		if err != nil {
-			continue
-		}
-		if _, err := os.Stat(srcPath); err == nil {
-			data, err := os.ReadFile(srcPath)
-			if err != nil {
-				continue
-			}
-			if err := os.WriteFile(dllPath, data, 0644); err == nil {
-				log.Printf("Copied wintun.dll from %s to %s", srcPath, dllPath)
-				return
-			}
-		}
+	if err := os.WriteFile(dllPath, embeddedWintunDLL, 0644); err != nil {
+		log.Printf("Warning: failed to write wintun.dll to %s: %v", dllPath, err)
+		return
 	}
-	log.Printf("Warning: wintun.dll not found (checked %s and fallback paths)", dllPath)
+	log.Printf("Extracted embedded wintun.dll to %s", dllPath)
 }
 
 const (

@@ -19,6 +19,8 @@
 
 ### Fixed
 
+- Windows client embeds `wintun.dll` and extracts it beside the exe on first run (single-file download)
+- CI: TUN/Wintun code is Windows-tagged so Linux `go vet`/`go test` on vpncore pass
 - Settings honesty: skip auto-join for password rooms without session pass (`auto_join_skipped`); `SaveSettings` returns reconnect-needed for SOCKS5/STUN/token; locked-room invite copy warns when password omitted; Reset clears Windows Run key
 - Hide console flash: `netsh`/`reg` via `HiddenCommand` (`CREATE_NO_WINDOW`)
 - TUN Close ends session, nils adapter, recreates stop chan so Start can reopen; P2P/relay send is XOR (no always-also-relay); STUN uses shared listen conn; chat truncate by runes; drop peer packets not destined to local VIP; OnSignal no longer wipes peer info; reconnect waits for auth before JoinRoom
