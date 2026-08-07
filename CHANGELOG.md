@@ -2,6 +2,10 @@
 
 ## 1.1.0 — 2026-08-07
 
+### License
+
+- Project license is **Apache-2.0** (was MIT). See `LICENSE` and `NOTICE`.
+
 ### UI
 
 - Operate polish: Entangled brand on Connect, collapsed Advanced network, durable error strip, sidebar overflow menu (Leave / Remove saved / Delete), humanized path labels + tooltips, quieter space backdrop, light-theme success/warning/error tokens, a11y focus rings / ARIA / Esc
@@ -31,5 +35,5 @@
 - Usability: reconnect, invite copy/paste, copy VIP, peer path (p2p/relay/ws), room delete for owners
 - Chat: per-thread history, delivery/retry, unread badges, system join/leave lines; cipher always installed for relay chat
 - Security: argon2id room passwords, optional `ENTANGLED_TOKEN`, relay registration tokens, HKDF session keys, random client IDs, rate limits, redacted WS logs
-- OSS: MIT license, README, CONTRIBUTING, CI, smoke tests
+- OSS: license, README, CONTRIBUTING, CI, smoke tests
 - Removed committed deploy secrets / SSH key material from the working tree (rotate any previously exposed keys; scrub history before public push)

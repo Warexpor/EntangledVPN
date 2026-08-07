@@ -1,0 +1,16 @@
+Entangled VPN
+Copyright 2026 Warexpor and Entangled contributors
+
+Licensed under the Apache License, Version 2.0.
+See the LICENSE file for the full license text.
+
+This product includes software developed by the Entangled contributors.
+
+---
+
+Third-party components redistributed with Windows client builds:
+
+Wintun (https://www.wintun.net/)
+  Copyright (C) WireGuard LLC. All Rights Reserved.
+  Redistributed as wintun.dll alongside Entangled.exe.
+  See https://git.zx2c4.com/wintun/about/#license for Wintun's license terms.

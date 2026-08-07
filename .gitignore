@@ -10,6 +10,7 @@ entangled-client*
 build/bin/
 build/
 client/build/
+dist-release/
 # Node
 node_modules/
 **/node_modules/

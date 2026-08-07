@@ -9,7 +9,7 @@ Create a virtual LAN (`10.242.0.0/24`), chat, and play over P2P UDP with automat
 | **Client** | Windows — Wails + Wintun (run as Administrator) |
 | **Server** | Linux or Windows — Go binary (WebSocket signaling + UDP relay) |
 | **Crypto** | X25519 + HKDF-only (`hkdf-v1`) + XChaCha20-Poly1305 |
-| **License** | [MIT](LICENSE) |
+| **License** | [Apache-2.0](LICENSE) · [NOTICE](NOTICE) |
 
 [Changelog](CHANGELOG.md) · [Contributing](CONTRIBUTING.md) · [Security](SECURITY.md)
 
@@ -107,6 +107,13 @@ App version constant: `client/vpncore/version.go` (`AppVersion`).
 | `client/frontend/` | Svelte UI |
 | `scripts/` | Build / deploy helpers (no secrets) |
 
+## Releases
+
+Windows client builds ship as a zip with **`Entangled.exe` + `wintun.dll`** (required next to the exe). Run as Administrator.
+
+Server binaries are attached to the same GitHub Release when published.
+
 ## License
 
-MIT — see [LICENSE](LICENSE).
+Apache License 2.0 — see [LICENSE](LICENSE) and [NOTICE](NOTICE).
+Wintun (`wintun.dll`) is third-party; see NOTICE for attribution.
