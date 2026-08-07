@@ -1,17 +1,29 @@
-# Entangled
+# Entangled VPN
 
-Mesh VPN for small friend groups: create a virtual LAN (`10.242.0.0/24`), chat, and game over P2P UDP with relay fallback.
+**v1.1.0** — Mesh VPN for small friend groups.
 
-**Client:** Windows (Wails + Wintun). **Server:** Linux/Windows Go binary (WebSocket signaling + UDP relay).
+Create a virtual LAN (`10.242.0.0/24`), chat, and play over P2P UDP with automatic relay fallback when NAT wins.
 
-## Threat model (short)
+| | |
+|---|---|
+| **Client** | Windows — Wails + Wintun (run as Administrator) |
+| **Server** | Linux or Windows — Go binary (WebSocket signaling + UDP relay) |
+| **Crypto** | X25519 + HKDF-only (`hkdf-v1`) + XChaCha20-Poly1305 |
+| **License** | [MIT](LICENSE) |
 
-- Room traffic between peers is encrypted with X25519 + **HKDF-only** (`hkdf-v1`) + XChaCha20-Poly1305. Legacy raw-X25519 session keys are gone — **every friend must rebuild** on a matching client or crypto will fail.
-- The signaling/relay server sees metadata (who joins which room, public keys, addresses) and can MITM key exchange if you do not trust the operator. Host your own server with friends you trust.
-- Put the HTTP WebSocket behind TLS (`wss://`) in production. The server itself listens in cleartext for use behind Caddy/nginx.
-- Optional `ENTANGLED_TOKEN` shared secret gates server auth **and** UDP relay registration (token-only REG; no password-based relay enroll). Empty token = open server (fine for a private VPS among friends).
-- Saved networks never store room passwords on disk (`rooms.json` has name/server only). Join still needs the invite password when required.
-- If this repository (or a fork) ever contained deploy SSH keys, **rotate those keys** and scrub git history before publishing.
+[Changelog](CHANGELOG.md) · [Contributing](CONTRIBUTING.md) · [Security](SECURITY.md)
+
+> **Breaking in 1.1.0:** HKDF-only session keys + token-only relay REG. Every peer (and the server) must be on 1.1.0 — old 1.0.0 clients will not interoperate.
+
+## Features
+
+- Virtual IP mesh with room chat and DMs
+- P2P / relay / WebSocket path indicator
+- Auto-reconnect with room re-join
+- Saved networks + pipe invites (`server|room|password`)
+- Room owner can delete the network
+- Optional shared `ENTANGLED_TOKEN` for server + relay auth
+- UI languages: English, Russian, Chinese
 
 ## Quick start — server
 
@@ -21,16 +33,25 @@ go build -o entangled-server .
 ./entangled-server -addr :8080 -relay :3478
 ```
 
-Optional:
+Optional shared secret (recommended on a public VPS):
 
 ```bash
 export ENTANGLED_TOKEN='your-shared-secret'
 ./entangled-server
 ```
 
-Health: `curl http://127.0.0.1:8080/health`
+Health check: `curl http://127.0.0.1:8080/health`
 
-### TLS with Caddy (recommended)
+Cross-compile Linux amd64 from elsewhere:
+
+```bash
+cd server
+GOOS=linux GOARCH=amd64 go build -o entangled-server-linux .
+```
+
+### TLS (recommended)
+
+Put the WebSocket behind Caddy/nginx. The Go process listens in cleartext for that proxy.
 
 ```
 your.domain {
@@ -38,17 +59,13 @@ your.domain {
 }
 ```
 
-Clients connect to `wss://your.domain` (or `your.domain:443`). UDP relay still needs port **3478/UDP** open to the server host.
+Clients use `wss://your.domain`. Open **3478/UDP** on the host for the relay (TCP 443 via the proxy is enough for signaling).
 
-Firewall: **8080/TCP** (or 443 via proxy), **3478/UDP**.
-
-Example deploy script (no secrets): [scripts/deploy.example.sh](scripts/deploy.example.sh).
+Secret-free deploy template: [scripts/deploy.example.sh](scripts/deploy.example.sh).
 
 ## Quick start — Windows client
 
-Requirements: Go 1.22+, Node 18+, [Wails v2](https://wails.io/), Administrator for Wintun.
-
-**Breaking (1.1.0):** HKDF-only crypto + token-only relay REG. Old 1.0.0 clients cannot talk to 1.1.0 peers — all friends must rebuild. Deploy a matching server too.
+Needs: Go 1.22+, Node 18+, [Wails v2](https://wails.io/), Administrator privileges for Wintun.
 
 ```bash
 cd client/frontend && npm ci && npm run build && cd ../..
@@ -56,31 +73,30 @@ cd client
 wails build
 ```
 
-Run `build/bin/Entangled.exe` as Administrator. Enter server `host:8080` (or `wss://host`), nickname, connect, create/join a network.
+Run `build/bin/Entangled.exe` **as Administrator**.
 
-Invite friends with **Copy invite** — pipe format `server|room|password` (password segment may be empty for open rooms). Paste invite in the join dialog. Saved networks do **not** keep passwords on disk; re-enter when joining a protected room.
+1. Enter server (`host:8080` or `wss://host`), nickname, and token if the server requires one.
+2. Create or join a network.
+3. Share **Copy invite** — format `server|room|password` (password may be empty for open rooms).
 
-## Features
+Saved networks store name/server only — **not** room passwords. Re-enter the password when joining a protected room.
 
-- Virtual IP mesh + peer chat (DM + room)
-- Auto-reconnect with room re-join
-- P2P / relay / WebSocket path indicator
-- Saved networks, invite paste, copy VIP
-- Room owner can delete the network
-- i18n: English, Russian, Chinese
+## Threat model (short)
+
+- Peer traffic is E2E-encrypted (X25519 → HKDF → XChaCha20-Poly1305). Packet loss does not desync nonces (random nonces per packet).
+- The signaling/relay server sees metadata (who joins which room, public keys, addresses) and **can MITM key exchange** if you do not trust the operator. Self-host with people you trust.
+- Empty `ENTANGLED_TOKEN` = open server (fine for a private friend VPS). Set a token for anything reachable from the wider internet.
+- Room passwords are never written to `rooms.json`.
 
 ## Development
 
 ```bash
-# server tests
 cd server && go test ./...
-
-# client vpncore tests
 cd client && go test ./vpncore/...
-
-# frontend
 cd client/frontend && npm ci && npm run build
 ```
+
+App version constant: `client/vpncore/version.go` (`AppVersion`).
 
 ## Layout
 
@@ -89,7 +105,7 @@ cd client/frontend && npm ci && npm run build
 | `server/` | Signaling hub + UDP relay |
 | `client/` | Wails app + `vpncore` |
 | `client/frontend/` | Svelte UI |
-| `scripts/deploy.example.sh` | Secret-free deploy template |
+| `scripts/` | Build / deploy helpers (no secrets) |
 
 ## License
 
