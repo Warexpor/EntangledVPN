@@ -4,6 +4,10 @@
 
 Create a virtual LAN (`10.242.0.0/24`), chat, and play over P2P UDP with automatic relay fallback when NAT wins.
 
+<p align="center">
+  <img src="docs/showcase.png" alt="Entangled VPN — connect screen" width="720" />
+</p>
+
 | | |
 |---|---|
 | **Client** | Windows — Wails + Wintun (run as Administrator) |
@@ -112,6 +116,11 @@ App version constant: `client/vpncore/version.go` (`AppVersion`).
 **Windows client:** download **`Entangled.exe`** from the [GitHub Release](https://github.com/Warexpor/EntangledVPN/releases) and run it **as Administrator**. Wintun is embedded — the first launch writes `wintun.dll` next to the exe (leave that file there).
 
 Server binaries (`entangled-server-linux-amd64`, `entangled-server-windows-amd64.exe`) are on the same Release.
+
+## Credits
+
+- **[ProGaMEr110521](https://github.com/ProGaMEr110521)** — initiator; main developer of the first working build
+- **[Warexpor](https://github.com/Warexpor)** — polish, expansion, and maintenance
 
 ## License
 

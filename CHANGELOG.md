@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+### Docs
+
+- README connect-screen showcase image; credit ProGaMEr110521 as initiator / first working build (Warexpor: polish, expansion, maintenance); NOTICE authorship note
+
 ## 1.1.0 — 2026-08-07
 
 ### License
