@@ -1,6 +1,6 @@
 # Entangled VPN
 
-**v1.1.0** — Mesh VPN for small friend groups.
+**v1.2.0** — Mesh VPN for small friend groups.
 
 Create a virtual LAN (`10.242.0.0/24`), chat, and play over P2P UDP with automatic relay fallback when NAT wins.
 
@@ -25,7 +25,8 @@ Create a virtual LAN (`10.242.0.0/24`), chat, and play over P2P UDP with automat
 - P2P / relay / WebSocket path indicator
 - Auto-reconnect with room re-join
 - Saved networks + pipe invites (`server|room|password`)
-- Room owner can delete the network
+- Room owner can delete the network (capability `owner_token`)
+- In-app Check for updates / Update (Windows client)
 - Optional shared `ENTANGLED_TOKEN` for server + relay auth
 - UI languages: English, Russian, Chinese
 

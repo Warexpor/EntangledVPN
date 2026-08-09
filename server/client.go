@@ -111,8 +111,9 @@ type CreateRoomPayload struct {
 }
 
 type JoinRoomPayload struct {
-	Name     string `json:"name"`
-	Password string `json:"password,omitempty"`
+	Name       string `json:"name"`
+	Password   string `json:"password,omitempty"`
+	OwnerToken string `json:"owner_token,omitempty"`
 }
 
 type PeerInfoPayload struct {
@@ -190,41 +191,39 @@ func (c *Client) handleMessage(raw []byte) {
 			c.sendError("invalid payload")
 			return
 		}
-		c.Hub.JoinRoom(p.Name, p.Password, c)
+		c.Hub.JoinRoom(p.Name, p.Password, p.OwnerToken, c)
 
 	case "leave_room":
+		if !c.Authed {
+			c.sendError("not authenticated")
+			return
+		}
 		c.Hub.LeaveRoom(c)
 
 	case "peer_info":
+		if !c.Authed {
+			c.sendError("not authenticated")
+			return
+		}
 		var p PeerInfoPayload
 		if err := json.Unmarshal(msg.Payload, &p); err != nil {
 			c.sendError("invalid peer info")
 			return
 		}
 		c.mu.Lock()
+		// Bind pubkey once per session — prevents mid-session spoof swaps.
+		if c.PublicKey == "" && p.PublicKey != "" {
+			c.PublicKey = p.PublicKey
+		}
 		c.LocalAddr = p.LocalAddr
-		c.PublicKey = p.PublicKey
 		c.ExternalAddr = p.ExternalAddr
 		c.Crypto = p.Crypto
 		room := c.Room
 		vip := c.VirtualIP
 		pubIP := c.PublicIP
+		pubKey := c.PublicKey
 		crypto := c.Crypto
 		c.mu.Unlock()
-
-		// Persist stable owner identity from first peer_info pubkey.
-		if room != nil && p.PublicKey != "" {
-			persistOwner := false
-			c.Hub.mu.Lock()
-			if room.OwnerPubKey == "" && room.OwnerID == c.ID {
-				room.OwnerPubKey = p.PublicKey
-				persistOwner = true
-			}
-			c.Hub.mu.Unlock()
-			if persistOwner {
-				c.Hub.SaveRooms()
-			}
-		}
 
 		if room != nil {
 			publicAddr := choosePublicAddr(pubIP, p.ExternalAddr, p.LocalAddr)
@@ -233,7 +232,7 @@ func (c *Client) handleMessage(raw []byte) {
 				"virtual_ip":  vip,
 				"local_addr":  p.LocalAddr,
 				"public_addr": publicAddr,
-				"public_key":  p.PublicKey,
+				"public_key":  pubKey,
 			}
 			if crypto != "" {
 				payload["crypto"] = crypto
@@ -245,12 +244,23 @@ func (c *Client) handleMessage(raw []byte) {
 		}
 
 	case "relay_data":
+		if !c.Authed {
+			c.sendError("not authenticated")
+			return
+		}
 		var p struct {
 			To string `json:"to"`
 			D  string `json:"d"`
 		}
 		if err := json.Unmarshal(msg.Payload, &p); err != nil || p.To == "" || p.D == "" {
 			c.sendError("invalid relay_data payload")
+			return
+		}
+		c.mu.RLock()
+		room := c.Room
+		c.mu.RUnlock()
+		if room == nil || !room.HasClient(p.To) {
+			c.sendError("relay target not in room")
 			return
 		}
 		c.Hub.mu.Lock()
@@ -264,14 +274,19 @@ func (c *Client) handleMessage(raw []byte) {
 		}
 
 	case "delete_room":
+		if !c.Authed {
+			c.sendError("not authenticated")
+			return
+		}
 		var p struct {
-			Name string `json:"name"`
+			Name       string `json:"name"`
+			OwnerToken string `json:"owner_token,omitempty"`
 		}
 		if err := json.Unmarshal(msg.Payload, &p); err != nil || p.Name == "" {
 			c.sendError("invalid delete_room payload")
 			return
 		}
-		c.Hub.DeleteRoom(p.Name, c)
+		c.Hub.DeleteRoom(p.Name, p.OwnerToken, c)
 
 	default:
 		c.sendError("unknown message type")

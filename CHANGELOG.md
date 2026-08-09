@@ -2,9 +2,24 @@
 
 ## Unreleased
 
+## 1.2.0 — 2026-08-09
+
+### Added
+
+- Settings: Check for updates / Update downloads `Entangled.exe` from GitHub Releases, swaps after exit, and relaunches
+
+### Security
+
+- Room ownership uses an opaque `owner_token` (not a forgeable peer public key); delete/reclaim require the token
+- Sensitive WebSocket handlers require auth; `peer_info` binds pubkey once; `relay_data` same-room only
+
 ### Docs
 
 - README connect-screen showcase image; credit ProGaMEr110521 as initiator / first working build (Warexpor: polish, expansion, maintenance); NOTICE authorship note
+
+### Fixed
+
+- Signaling address tests use TEST-NET instead of a real host IP
 
 ## 1.1.0 — 2026-08-07
 

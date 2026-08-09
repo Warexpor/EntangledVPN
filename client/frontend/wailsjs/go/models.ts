@@ -97,6 +97,7 @@ export namespace main {
 	    password?: string;
 	    server: string;
 	    locked?: boolean;
+	    owner_token?: string;
 	
 	    static createFrom(source: any = {}) {
 	        return new SavedRoomEntry(source);
@@ -108,6 +109,27 @@ export namespace main {
 	        this.password = source["password"];
 	        this.server = source["server"];
 	        this.locked = source["locked"];
+	        this.owner_token = source["owner_token"];
+	    }
+	}
+	export class UpdateInfo {
+	    current: string;
+	    latest: string;
+	    available: boolean;
+	    notes: string;
+	    assetURL: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new UpdateInfo(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.current = source["current"];
+	        this.latest = source["latest"];
+	        this.available = source["available"];
+	        this.notes = source["notes"];
+	        this.assetURL = source["assetURL"];
 	    }
 	}
 

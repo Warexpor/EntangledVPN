@@ -76,11 +76,13 @@ func configPath() string {
 
 // SavedRoomEntry is persisted to rooms.json. Password is never written
 // (omitempty strips any legacy field on rewrite). Locked is a non-secret flag.
+// OwnerToken is a local capability secret for room delete/reclaim (0600 file).
 type SavedRoomEntry struct {
-	Name     string `json:"name"`
-	Password string `json:"password,omitempty"`
-	Server   string `json:"server"`
-	Locked   bool   `json:"locked,omitempty"`
+	Name       string `json:"name"`
+	Password   string `json:"password,omitempty"`
+	Server     string `json:"server"`
+	Locked     bool   `json:"locked,omitempty"`
+	OwnerToken string `json:"owner_token,omitempty"`
 }
 
 func roomsPath() string {
@@ -92,7 +94,7 @@ func (a *App) GetSavedRooms() []SavedRoomEntry {
 	if rooms == nil {
 		return []SavedRoomEntry{}
 	}
-	// Never expose disk passwords to UI (legacy rooms.json may still have them).
+	// Never expose disk passwords or owner tokens to UI.
 	out := make([]SavedRoomEntry, len(rooms))
 	for i, r := range rooms {
 		out[i] = SavedRoomEntry{Name: r.Name, Server: r.Server, Locked: r.Locked}
@@ -101,10 +103,18 @@ func (a *App) GetSavedRooms() []SavedRoomEntry {
 }
 
 // SaveRoom persists name+server+locked. Password stays in-memory via JoinRoom/CreateRoom.
+// Existing OwnerToken for the room name is preserved.
 func (a *App) SaveRoom(name, password string) {
 	cfg := a.LoadConfig()
-	entry := SavedRoomEntry{Name: name, Server: cfg.ServerAddr, Locked: password != ""}
 	rooms := a.loadRoomsRaw()
+	prevToken := ""
+	for _, r := range rooms {
+		if r.Name == name {
+			prevToken = r.OwnerToken
+			break
+		}
+	}
+	entry := SavedRoomEntry{Name: name, Server: cfg.ServerAddr, Locked: password != "", OwnerToken: prevToken}
 	found := false
 	for i, r := range rooms {
 		if r.Name == name {
@@ -117,6 +127,40 @@ func (a *App) SaveRoom(name, password string) {
 		rooms = append(rooms, entry)
 	}
 	a.writeRooms(rooms)
+}
+
+func (a *App) saveOwnerToken(room, token string) {
+	if room == "" || token == "" {
+		return
+	}
+	rooms := a.loadRoomsRaw()
+	found := false
+	for i, r := range rooms {
+		if r.Name == room {
+			rooms[i].OwnerToken = token
+			found = true
+			break
+		}
+	}
+	if !found {
+		cfg := a.LoadConfig()
+		rooms = append(rooms, SavedRoomEntry{Name: room, Server: cfg.ServerAddr, OwnerToken: token})
+	}
+	a.writeRooms(rooms)
+	a.mu.Lock()
+	if a.vpn != nil {
+		a.vpn.SetOwnerToken(room, token)
+	}
+	a.mu.Unlock()
+}
+
+func (a *App) ownerTokenFor(name string) string {
+	for _, r := range a.loadRoomsRaw() {
+		if r.Name == name {
+			return r.OwnerToken
+		}
+	}
+	return ""
 }
 
 func (a *App) loadRoomsRaw() []SavedRoomEntry {
@@ -139,10 +183,10 @@ func (a *App) loadRoomsRaw() []SavedRoomEntry {
 }
 
 func (a *App) writeRooms(rooms []SavedRoomEntry) {
-	// Strip passwords before write (migrate legacy files). Keep Locked.
+	// Strip passwords before write (migrate legacy files). Keep Locked + OwnerToken.
 	clean := make([]SavedRoomEntry, len(rooms))
 	for i, r := range rooms {
-		clean[i] = SavedRoomEntry{Name: r.Name, Server: r.Server, Locked: r.Locked}
+		clean[i] = SavedRoomEntry{Name: r.Name, Server: r.Server, Locked: r.Locked, OwnerToken: r.OwnerToken}
 	}
 	if err := os.MkdirAll(configDir(), 0755); err != nil {
 		vpncore.Logger.Printf("SaveRoom: mkdir error: %v", err)
@@ -163,7 +207,7 @@ func (a *App) RemoveSavedRoom(name string) {
 	filtered := make([]SavedRoomEntry, 0, len(rooms))
 	for _, r := range rooms {
 		if r.Name != name {
-			filtered = append(filtered, SavedRoomEntry{Name: r.Name, Server: r.Server, Locked: r.Locked})
+			filtered = append(filtered, SavedRoomEntry{Name: r.Name, Server: r.Server, Locked: r.Locked, OwnerToken: r.OwnerToken})
 		}
 	}
 	a.writeRooms(filtered)
@@ -385,6 +429,11 @@ func (a *App) Connect(serverAddr, nickname string) (AppStatus, error) {
 	}
 	a.vpn = vpncore.NewVPNCore(vpnCfg)
 	a.vpn.SetP2POnly(cfg.P2POnly)
+	for _, r := range a.loadRoomsRaw() {
+		if r.OwnerToken != "" {
+			a.vpn.SetOwnerToken(r.Name, r.OwnerToken)
+		}
+	}
 	a.wireVPN(a.vpn)
 	a.mu.Unlock()
 
@@ -462,6 +511,9 @@ func (a *App) wireVPN(vpn *vpncore.VPNCore) {
 	}
 	vpn.OnRoomDeleted = func(name string) {
 		emitEvent("room_deleted", map[string]string{"name": name})
+	}
+	vpn.OnOwnerToken = func(room, token string) {
+		a.saveOwnerToken(room, token)
 	}
 }
 

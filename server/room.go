@@ -23,14 +23,16 @@ type StoredRoom struct {
 	Password     string `json:"password,omitempty"` // legacy plaintext; migrated on load
 	CreatedAt    string `json:"created_at"`
 	OwnerID      string `json:"owner_id"`
-	OwnerPubKey  string `json:"owner_pubkey,omitempty"`
+	OwnerToken   string `json:"owner_token,omitempty"`
+	OwnerPubKey  string `json:"owner_pubkey,omitempty"` // legacy metadata only; not used for auth
 }
 
 type Room struct {
 	Name         string
 	PasswordHash string
 	OwnerID      string
-	OwnerPubKey  string
+	OwnerToken   string
+	OwnerPubKey  string // legacy metadata only; not used for auth
 	CreatedAt    string
 	Clients      map[string]*Client
 	mu           sync.RWMutex
@@ -42,12 +44,12 @@ type RelayTokenEntry struct {
 	Expiry    time.Time
 }
 
-func NewRoom(name, passwordHash, ownerID, ownerPubKey string) *Room {
+func NewRoom(name, passwordHash, ownerID, ownerToken string) *Room {
 	return &Room{
 		Name:         name,
 		PasswordHash: passwordHash,
 		OwnerID:      ownerID,
-		OwnerPubKey:  ownerPubKey,
+		OwnerToken:   ownerToken,
 		CreatedAt:    time.Now().Format(time.RFC3339),
 		Clients:      make(map[string]*Client),
 	}
@@ -65,17 +67,49 @@ func hashPassword(password string) (string, error) {
 	return "argon2id$" + base64.RawStdEncoding.EncodeToString(salt) + "$" + base64.RawStdEncoding.EncodeToString(hash), nil
 }
 
+// isOwner is session-ID only. Reclaim across reconnects uses OwnerToken
+// (see claimOwner), not the advertised peer public key (forgeable).
 func (r *Room) isOwner(c *Client) bool {
 	if r == nil || c == nil {
 		return false
 	}
-	if r.OwnerID != "" && r.OwnerID == c.ID {
-		return true
+	return r.OwnerID != "" && r.OwnerID == c.ID
+}
+
+func (r *Room) validOwnerToken(token string) bool {
+	if r == nil || r.OwnerToken == "" || token == "" {
+		return false
 	}
-	c.mu.RLock()
-	pub := c.PublicKey
-	c.mu.RUnlock()
-	return r.OwnerPubKey != "" && pub != "" && r.OwnerPubKey == pub
+	return subtle.ConstantTimeCompare([]byte(r.OwnerToken), []byte(token)) == 1
+}
+
+// claimOwner binds this session as owner when token matches, or (legacy)
+// when the room has no token yet — first successful claim after upgrade.
+func (r *Room) claimOwner(c *Client, token string) (isOwner bool, issuedToken string) {
+	if r == nil || c == nil {
+		return false, ""
+	}
+	if r.validOwnerToken(token) {
+		r.OwnerID = c.ID
+		return true, r.OwnerToken
+	}
+	if r.OwnerToken == "" {
+		r.OwnerToken = newOwnerToken()
+		r.OwnerID = c.ID
+		return true, r.OwnerToken
+	}
+	if r.isOwner(c) {
+		return true, r.OwnerToken
+	}
+	return false, ""
+}
+
+func newOwnerToken() string {
+	b := make([]byte, 24)
+	if _, err := rand.Read(b); err != nil {
+		return ""
+	}
+	return hex.EncodeToString(b)
 }
 
 func verifyPassword(stored, password string) bool {
@@ -225,6 +259,13 @@ func (h *Hub) CreateRoom(name, password string, creator *Client) {
 		return
 	}
 
+	ownerToken := newOwnerToken()
+	if ownerToken == "" {
+		log.Printf("create_room failed: owner token entropy")
+		creator.sendError("failed to create room")
+		return
+	}
+
 	h.mu.Lock()
 
 	if _, exists := h.Rooms[name]; exists {
@@ -233,11 +274,7 @@ func (h *Hub) CreateRoom(name, password string, creator *Client) {
 		return
 	}
 
-	creator.mu.RLock()
-	ownerPub := creator.PublicKey
-	creator.mu.RUnlock()
-
-	room := NewRoom(name, hash, creator.ID, ownerPub)
+	room := NewRoom(name, hash, creator.ID, ownerToken)
 	h.Rooms[name] = room
 
 	h.leaveRoom(creator)
@@ -267,15 +304,16 @@ func (h *Hub) CreateRoom(name, password string, creator *Client) {
 
 	token := h.issueRelayToken(creator, vip)
 	creator.sendMessage("room_joined", mustMarshal(map[string]interface{}{
-		"room":        name,
-		"is_owner":    true,
-		"virtual_ip":  vip,
-		"peer_list":   room.GetPeersList(creator.ID),
-		"relay_token": token,
+		"room":         name,
+		"is_owner":     true,
+		"virtual_ip":   vip,
+		"peer_list":    room.GetPeersList(creator.ID),
+		"relay_token":  token,
+		"owner_token":  ownerToken,
 	}))
 }
 
-func (h *Hub) JoinRoom(name, password string, client *Client) {
+func (h *Hub) JoinRoom(name, password, ownerToken string, client *Client) {
 	h.mu.Lock()
 
 	room, exists := h.Rooms[name]
@@ -324,9 +362,15 @@ func (h *Hub) JoinRoom(name, password string, client *Client) {
 	}
 	room.mu.Unlock()
 
+	owner, issuedToken := room.claimOwner(client, ownerToken)
+	dirty := owner && issuedToken != ""
+
 	vip, err := h.assignVirtualIPLocked(client)
-	owner := room.isOwner(client)
 	h.mu.Unlock()
+
+	if dirty {
+		h.SaveRooms()
+	}
 
 	if err != nil {
 		h.LeaveRoom(client)
@@ -350,13 +394,17 @@ func (h *Hub) JoinRoom(name, password string, client *Client) {
 
 	log.Printf("room joined: %s by %s (%s), peers=%d, vip=%s, owner=%v", name, client.Nickname, client.ID, len(peers), vip, owner)
 
-	client.sendMessage("room_joined", mustMarshal(map[string]interface{}{
+	payload := map[string]interface{}{
 		"room":        name,
 		"is_owner":    owner,
 		"virtual_ip":  vip,
 		"peer_list":   peers,
 		"relay_token": token,
-	}))
+	}
+	if owner && issuedToken != "" {
+		payload["owner_token"] = issuedToken
+	}
+	client.sendMessage("room_joined", mustMarshal(payload))
 
 	room.BroadcastExcept(client, Message{
 		Type: "peer_joined",
@@ -399,7 +447,7 @@ func (h *Hub) leaveRoom(client *Client) {
 	})
 }
 
-func (h *Hub) DeleteRoom(name string, requester *Client) {
+func (h *Hub) DeleteRoom(name, ownerToken string, requester *Client) {
 	h.mu.Lock()
 	room, exists := h.Rooms[name]
 	if !exists {
@@ -407,7 +455,7 @@ func (h *Hub) DeleteRoom(name string, requester *Client) {
 		requester.sendError("room not found")
 		return
 	}
-	if !room.isOwner(requester) {
+	if !room.isOwner(requester) && !room.validOwnerToken(ownerToken) {
 		h.mu.Unlock()
 		requester.sendError("only the room owner can delete this room")
 		return
@@ -449,6 +497,7 @@ func (h *Hub) SaveRooms() {
 			PasswordHash: room.PasswordHash,
 			CreatedAt:    room.CreatedAt,
 			OwnerID:      room.OwnerID,
+			OwnerToken:   room.OwnerToken,
 			OwnerPubKey:  room.OwnerPubKey,
 		}
 	}
@@ -496,6 +545,7 @@ func (h *Hub) LoadRooms() {
 			Name:         sr.Name,
 			PasswordHash: hash,
 			OwnerID:      sr.OwnerID,
+			OwnerToken:   sr.OwnerToken,
 			OwnerPubKey:  sr.OwnerPubKey,
 			CreatedAt:    sr.CreatedAt,
 			Clients:      make(map[string]*Client),

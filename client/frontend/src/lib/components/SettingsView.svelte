@@ -1,11 +1,53 @@
 <script>
   import { onMount } from 'svelte'
   import { settings, addNotification } from '../stores/app.js'
-  import { t, setLang, currentLang } from '../locales/index.js'
+  import { t, setLang, currentLang, fmt } from '../locales/index.js'
 
   let cfg = { ...$settings }
   let version = '1.0.0'
   let needsReconnect = false
+  let updateBusy = false
+  let updateStatus = '' // '', 'checking', 'latest', 'available', 'downloading', 'error'
+  let updateLatest = ''
+  let updateError = ''
+
+  async function checkForUpdate() {
+    updateBusy = true
+    updateStatus = 'checking'
+    updateError = ''
+    updateLatest = ''
+    try {
+      const info = await window.go.main.App.CheckForUpdate()
+      if (info?.available) {
+        updateStatus = 'available'
+        updateLatest = info.latest || ''
+      } else {
+        updateStatus = 'latest'
+      }
+    } catch (e) {
+      updateStatus = 'error'
+      updateError = String(e)
+      addNotification($t.error_update_check + e, 'error')
+    } finally {
+      updateBusy = false
+    }
+  }
+
+  async function applyUpdate() {
+    if (!confirm($t.confirm_update)) return
+    updateBusy = true
+    updateStatus = 'downloading'
+    updateError = ''
+    try {
+      await window.go.main.App.ApplyUpdate()
+      addNotification($t.notif_updating, 'info')
+    } catch (e) {
+      updateStatus = 'error'
+      updateError = String(e)
+      updateBusy = false
+      addNotification($t.error_update + e, 'error')
+    }
+  }
 
   async function save() {
     $settings = { ...cfg }
@@ -144,6 +186,29 @@
       <span class="setting-label">{$t.start_windows}</span>
       <input type="checkbox" bind:checked={cfg.startWithWindows} />
     </label>
+
+    <div class="setting-row update-row">
+      <span class="setting-label">{$t.updates}</span>
+      <button class="btn btn-check" type="button" disabled={updateBusy} on:click={checkForUpdate}>
+        {$t.check_updates}
+      </button>
+      {#if updateStatus === 'available'}
+        <button class="btn btn-update" type="button" disabled={updateBusy} on:click={applyUpdate}>
+          {$t.apply_update}
+        </button>
+      {/if}
+    </div>
+    {#if updateStatus === 'checking'}
+      <p class="hint">{$t.update_checking}</p>
+    {:else if updateStatus === 'latest'}
+      <p class="hint">{$t.update_latest}</p>
+    {:else if updateStatus === 'available'}
+      <p class="hint">{fmt($t.update_available, { v: updateLatest })}</p>
+    {:else if updateStatus === 'downloading'}
+      <p class="hint">{$t.update_downloading}</p>
+    {:else if updateStatus === 'error' && updateError}
+      <p class="hint reconnect-hint">{$t.update_failed}: {updateError}</p>
+    {/if}
   </div>
 
   <div class="section">
@@ -291,5 +356,20 @@
   }
   .actions-section { display: flex; gap: 8px; align-items: center; }
   .actions-section .btn { min-height: 36px; padding: 8px 14px; }
+  .update-row { flex-wrap: wrap; }
+  .update-row .btn { min-height: 36px; padding: 8px 14px; }
+  .btn-check, .btn-update {
+    background: var(--bg-raised);
+    border: 1px solid var(--border);
+    color: var(--text-primary);
+    font-family: var(--font-mono);
+    font-size: var(--font-size-sm);
+    cursor: pointer;
+  }
+  .btn-check:hover:not(:disabled), .btn-update:hover:not(:disabled) {
+    border-color: var(--border-hover);
+    color: var(--text-bright);
+  }
+  .btn-check:disabled, .btn-update:disabled { opacity: 0.5; cursor: default; }
   .ver { margin-left: auto; color: var(--text-dim); font-size: var(--font-size-xs); }
 </style>

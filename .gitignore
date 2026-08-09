@@ -52,3 +52,6 @@ check_server_logs.py
 
 # Dead / unused tree
 /frontend/
+
+# Local agent project facts (not for the public repo)
+AGENTS.md

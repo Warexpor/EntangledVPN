@@ -31,8 +31,9 @@ type CreateRoomPayload struct {
 }
 
 type JoinRoomPayload struct {
-	Name     string `json:"name"`
-	Password string `json:"password,omitempty"`
+	Name       string `json:"name"`
+	Password   string `json:"password,omitempty"`
+	OwnerToken string `json:"owner_token,omitempty"`
 }
 
 type PeerInfoPayload struct {
@@ -50,6 +51,7 @@ type RoomJoinedPayload struct {
 	VirtualIP  string              `json:"virtual_ip"`
 	PeerList   []map[string]string `json:"peer_list"`
 	RelayToken string              `json:"relay_token,omitempty"`
+	OwnerToken string              `json:"owner_token,omitempty"`
 }
 
 type SignalingClient struct {
@@ -66,7 +68,7 @@ type SignalingClient struct {
 	OnPeerJoined   func(id, nickname string)
 	OnPeerLeft     func(id string)
 	OnPeerUpdated  func(id, virtualIP, localAddr, publicAddr, publicKey, crypto string)
-	OnRoomJoined   func(room string, isOwner bool, virtualIP string, peers []map[string]string, relayToken string)
+	OnRoomJoined   func(room string, isOwner bool, virtualIP string, peers []map[string]string, relayToken, ownerToken string)
 	OnRoomDeleted  func(name string)
 	OnError        func(msg string)
 	OnDisconnected func(intentional bool)
@@ -285,7 +287,7 @@ func (s *SignalingClient) handleMessage(m Message) {
 		if json.Unmarshal(m.Payload, &p) == nil {
 			s.logf("Room joined: %s (owner=%v, vip=%s, peers=%d)", p.Room, p.IsOwner, p.VirtualIP, len(p.PeerList))
 			if s.OnRoomJoined != nil {
-				s.OnRoomJoined(p.Room, p.IsOwner, p.VirtualIP, p.PeerList, p.RelayToken)
+				s.OnRoomJoined(p.Room, p.IsOwner, p.VirtualIP, p.PeerList, p.RelayToken, p.OwnerToken)
 			}
 		} else {
 			s.logf("Failed to parse room_joined")
@@ -375,9 +377,9 @@ func (s *SignalingClient) CreateRoom(name, password string) {
 	s.send(Message{Type: "create_room", Payload: mustMarshalWithLog(s.logf, CreateRoomPayload{Name: name, Password: password})})
 }
 
-func (s *SignalingClient) JoinRoom(name, password string) {
+func (s *SignalingClient) JoinRoom(name, password, ownerToken string) {
 	s.logf("Sending join_room: %s", name)
-	s.send(Message{Type: "join_room", Payload: mustMarshalWithLog(s.logf, JoinRoomPayload{Name: name, Password: password})})
+	s.send(Message{Type: "join_room", Payload: mustMarshalWithLog(s.logf, JoinRoomPayload{Name: name, Password: password, OwnerToken: ownerToken})})
 }
 
 func (s *SignalingClient) LeaveRoom() {
@@ -385,9 +387,9 @@ func (s *SignalingClient) LeaveRoom() {
 	s.send(Message{Type: "leave_room"})
 }
 
-func (s *SignalingClient) DeleteRoom(name string) {
+func (s *SignalingClient) DeleteRoom(name, ownerToken string) {
 	s.logf("Sending delete_room: %s", name)
-	s.send(Message{Type: "delete_room", Payload: mustMarshalWithLog(s.logf, map[string]string{"name": name})})
+	s.send(Message{Type: "delete_room", Payload: mustMarshalWithLog(s.logf, map[string]string{"name": name, "owner_token": ownerToken})})
 }
 
 func (s *SignalingClient) SendPeerInfo(virtualIP, localAddr, publicKey, externalAddr string) {

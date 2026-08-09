@@ -124,11 +124,15 @@ func TestParseRelayRegTokenOnly(t *testing.T) {
 	}
 }
 
-func TestRoomOwnerPubKey(t *testing.T) {
-	room := NewRoom("r", "", "owner-sess", "")
-	owner := &Client{ID: "owner-sess", PublicKey: "pk-owner"}
-	other := &Client{ID: "other", PublicKey: "pk-other"}
-	rejoin := &Client{ID: "new-sess", PublicKey: "pk-owner"}
+func TestRoomOwnerToken(t *testing.T) {
+	token := newOwnerToken()
+	if token == "" {
+		t.Fatal("expected owner token")
+	}
+	room := NewRoom("r", "", "owner-sess", token)
+	owner := &Client{ID: "owner-sess"}
+	other := &Client{ID: "other"}
+	rejoin := &Client{ID: "new-sess"}
 
 	if !room.isOwner(owner) {
 		t.Fatal("session owner should match")
@@ -136,12 +140,39 @@ func TestRoomOwnerPubKey(t *testing.T) {
 	if room.isOwner(other) {
 		t.Fatal("other should not be owner")
 	}
+	// Pubkey spoof must not grant ownership.
+	other.PublicKey = "pk-owner"
 	room.OwnerPubKey = "pk-owner"
-	if !room.isOwner(rejoin) {
-		t.Fatal("pubkey rejoin should be owner")
-	}
 	if room.isOwner(other) {
-		t.Fatal("other pubkey should not be owner")
+		t.Fatal("forgeable pubkey must not grant ownership")
+	}
+	ok, issued := room.claimOwner(rejoin, token)
+	if !ok || issued != token {
+		t.Fatal("token reclaim should succeed")
+	}
+	if !room.isOwner(rejoin) {
+		t.Fatal("rejoined session should be owner")
+	}
+	if room.isOwner(owner) {
+		t.Fatal("old session should no longer be owner")
+	}
+	ok, _ = room.claimOwner(other, "wrong")
+	if ok {
+		t.Fatal("wrong token must not claim ownership")
+	}
+}
+
+func TestLegacyOwnerClaimIssuesToken(t *testing.T) {
+	room := NewRoom("legacy", "", "stale-id", "")
+	first := &Client{ID: "first"}
+	ok, tok := room.claimOwner(first, "")
+	if !ok || tok == "" {
+		t.Fatal("legacy room should issue owner token on first claim")
+	}
+	second := &Client{ID: "second"}
+	ok, _ = room.claimOwner(second, "")
+	if ok {
+		t.Fatal("second joiner without token must not become owner")
 	}
 }
 

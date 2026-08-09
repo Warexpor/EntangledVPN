@@ -41,6 +41,7 @@ type VPNCore struct {
 	lastRoomPass   string
 	lastIsOwner    bool
 	relayToken     string
+	ownerTokens    map[string]string // room name → owner capability token
 	OnLog          func(string)
 	OnStatusChange func(ConnectionStatus)
 	OnPeersChange  func([]*Peer)
@@ -48,6 +49,7 @@ type VPNCore struct {
 	OnChat         func(fromID, nickname, message string, isDM bool)
 	OnSystemChat   func(text string)
 	OnRoomDeleted  func(name string)
+	OnOwnerToken   func(room, token string) // persist capability token locally
 }
 
 func (v *VPNCore) log(format string, args ...interface{}) {
@@ -197,7 +199,7 @@ func (v *VPNCore) connectSignaling() error {
 }
 
 func (v *VPNCore) wireSignalingHandlers(signaling *SignalingClient) {
-	signaling.OnRoomJoined = func(room string, isOwner bool, virtualIP string, peers []map[string]string, relayToken string) {
+	signaling.OnRoomJoined = func(room string, isOwner bool, virtualIP string, peers []map[string]string, relayToken, ownerToken string) {
 		v.log("OnRoomJoined: room=%s owner=%v peers=%d", room, isOwner, len(peers))
 
 		if virtualIP == "" {
@@ -217,7 +219,16 @@ func (v *VPNCore) wireSignalingHandlers(signaling *SignalingClient) {
 		v.lastRoomName = room
 		v.lastIsOwner = isOwner
 		v.relayToken = relayToken
+		if ownerToken != "" {
+			if v.ownerTokens == nil {
+				v.ownerTokens = make(map[string]string)
+			}
+			v.ownerTokens[room] = ownerToken
+		}
 		v.mu.Unlock()
+		if ownerToken != "" && v.OnOwnerToken != nil {
+			v.OnOwnerToken(room, ownerToken)
+		}
 		v.updateStatus()
 
 		v.mu.Lock()
@@ -496,7 +507,10 @@ func (v *VPNCore) reconnectLoop(gen int, room, pass string) {
 
 		if room != "" {
 			v.log("Re-joining room %s after reconnect", room)
-			v.signaling.JoinRoom(room, pass)
+			v.mu.Lock()
+			tok := v.ownerTokenLocked(room)
+			v.mu.Unlock()
+			v.signaling.JoinRoom(room, pass, tok)
 		}
 		return
 	}
@@ -581,6 +595,29 @@ func (v *VPNCore) Stop() {
 	v.updatePeers()
 }
 
+func (v *VPNCore) SetOwnerToken(room, token string) {
+	if room == "" {
+		return
+	}
+	v.mu.Lock()
+	defer v.mu.Unlock()
+	if v.ownerTokens == nil {
+		v.ownerTokens = make(map[string]string)
+	}
+	if token == "" {
+		delete(v.ownerTokens, room)
+		return
+	}
+	v.ownerTokens[room] = token
+}
+
+func (v *VPNCore) ownerTokenLocked(room string) string {
+	if v.ownerTokens == nil {
+		return ""
+	}
+	return v.ownerTokens[room]
+}
+
 func (v *VPNCore) CreateRoom(name, password string) {
 	v.log("CreateRoom called: %s", name)
 	v.mu.Lock()
@@ -596,9 +633,10 @@ func (v *VPNCore) JoinRoom(name, password string) {
 	v.mu.Lock()
 	v.lastRoomName = name
 	v.lastRoomPass = password
+	tok := v.ownerTokenLocked(name)
 	v.mu.Unlock()
 	v.peers.Clear()
-	v.signaling.JoinRoom(name, password)
+	v.signaling.JoinRoom(name, password, tok)
 }
 
 func (v *VPNCore) LeaveRoom() {
@@ -611,8 +649,11 @@ func (v *VPNCore) LeaveRoom() {
 
 func (v *VPNCore) DeleteRoom(name string) {
 	v.log("DeleteRoom called: %s", name)
+	v.mu.Lock()
+	tok := v.ownerTokenLocked(name)
+	v.mu.Unlock()
 	if v.signaling != nil {
-		v.signaling.DeleteRoom(name)
+		v.signaling.DeleteRoom(name, tok)
 	}
 }
 
