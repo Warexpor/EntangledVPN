@@ -2,6 +2,52 @@
 
 ## Unreleased
 
+## 1.2.8 — 2026-08-10
+
+### Changed
+
+- Settings: replace **P2P Only** with **Connection** mode — **Direct (P2P)** (default, prefers peer-to-peer, relay if needed) or **Relay (server)** (force all traffic through the relay)
+
+## 1.2.7 — 2026-08-10
+
+### Fixed
+
+- Path column shows **Direct** when the ping sample’s pong arrives over P2P (~30ms mixed-path RTT); app data still uses relay until the peer echoes that our ping also landed on P2P (avoids the false-Direct chat break)
+
+## 1.2.6 — 2026-08-10
+
+### Fixed
+
+- Do not mark path **Direct** from a P2P-delivered pong alone — that only proves peer→you. Pong now echoes how the ping arrived; Direct requires the ping landed on P2P too (fixes one-way chat after a false Direct upgrade)
+
+## 1.2.5 — 2026-08-10
+
+### Fixed
+
+- Stop dual-sending chat/data over P2P+relay (doubled messages); hole-punch probes only
+- Do not downgrade a proven **Direct** path when a slower relay copy of the same pong arrives
+- Deduplicate identical datagrams received on both paths within 2s
+
+## 1.2.4 — 2026-08-10
+
+### Fixed
+
+- **P2P Only** no longer skips relay before a pong proves the direct path — fixes one-way chat/ping when one peer has symmetric/CGNAT (STUN port ≠ send map)
+
+## 1.2.3 — 2026-08-10
+
+### Fixed
+
+- P2P sends prefer the learned live UDP source (NAT-mapped port), not only advertised candidates — fixes one-way ping / blank latency with **P2P Only**
+
+## 1.2.2 — 2026-08-10
+
+### Fixed
+
+- STUN tries Cloudflare then Google (Google `:19302` is blocked on some networks); empty external killed real P2P hole punch
+- `p2p-only` no longer errors on successful UDP send before a pong proves the path (1.2.1 regression)
+- Hole-punch probes both public and local candidate addresses
+
 ## 1.2.1 — 2026-08-10
 
 ### Fixed

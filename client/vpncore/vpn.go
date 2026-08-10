@@ -29,7 +29,7 @@ type VPNCore struct {
 	tun            *TUNAdapter
 	keyPair        *KeyPair
 	relay          *RelayClient
-	p2pOnly        bool
+	forceRelay     bool
 	status         ConnectionStatus
 	mu             sync.Mutex
 	listenerConn   *net.UDPConn
@@ -62,7 +62,7 @@ func (v *VPNCore) log(format string, args ...interface{}) {
 type VPNConfig struct {
 	ServerAddr string
 	Nickname   string
-	P2POnly    bool
+	ForceRelay bool // true = relay-only; false = prefer direct (P2P)
 	STUNServer string
 	MTU        int
 	DNSServer  string
@@ -83,23 +83,23 @@ type ConnectionStatus struct {
 
 func NewVPNCore(config *VPNConfig) *VPNCore {
 	v := &VPNCore{
-		config:  config,
-		peers:   NewPeerManager(),
-		p2pOnly: config.P2POnly,
-		status:  ConnectionStatus{Phase: "idle"},
+		config:     config,
+		peers:      NewPeerManager(),
+		forceRelay: config.ForceRelay,
+		status:     ConnectionStatus{Phase: "idle"},
 	}
-	v.peers.SetP2POnly(config.P2POnly)
+	v.peers.SetForceRelay(config.ForceRelay)
 	v.peers.OnPing = func(id string, ping int) {
 		v.updatePeers()
 	}
 	return v
 }
 
-func (v *VPNCore) SetP2POnly(enabled bool) {
+func (v *VPNCore) SetForceRelay(enabled bool) {
 	v.mu.Lock()
 	defer v.mu.Unlock()
-	v.p2pOnly = enabled
-	v.peers.SetP2POnly(enabled)
+	v.forceRelay = enabled
+	v.peers.SetForceRelay(enabled)
 }
 
 // ApplyTUNSettings updates MTU/DNS on a live TUN (no-op if TUN not created yet).
@@ -393,31 +393,28 @@ func (v *VPNCore) wireSignalingHandlers(signaling *SignalingClient) {
 		// Always install cipher so chat/data work over relay even if P2P fails.
 		v.peers.SetPeerCipher(id, cipher)
 
-		targets := []string{}
-		if publicAddr != "" {
-			targets = append(targets, publicAddr)
-		}
-		if localAddr != "" {
-			targets = append(targets, localAddr)
-		}
-
-		connected := false
-		for _, target := range targets {
+		var addrs []*net.UDPAddr
+		for _, target := range []string{publicAddr, localAddr} {
+			if target == "" {
+				continue
+			}
 			addr, err := net.ResolveUDPAddr("udp", target)
 			if err != nil || addr.Port == 0 {
 				continue
 			}
-			v.log("P2P connecting to %s at %s", id, target)
-			if err := v.peers.ConnectToPeer(id, addr, cipher); err != nil {
-				v.log("P2P connect to %s at %s failed: %v", id, target, err)
-			} else {
-				v.log("P2P connected to %s via %s", id, target)
-				connected = true
-				break
-			}
+			addrs = append(addrs, addr)
 		}
-		if !connected {
+		if len(addrs) == 0 {
 			v.log("P2P unavailable for %s — using relay/WS", id)
+		} else {
+			for _, a := range addrs {
+				v.log("P2P candidate for %s: %s", id, a)
+			}
+			if err := v.peers.ConnectToPeerAddrs(id, addrs, cipher); err != nil {
+				v.log("P2P connect to %s failed: %v", id, err)
+			} else {
+				v.log("P2P candidates set for %s (%d)", id, len(addrs))
+			}
 		}
 		v.updatePeers()
 	}
@@ -719,14 +716,10 @@ func (v *VPNCore) startPeerListener() {
 
 	externalAddr := ""
 	if signaling != nil && vip != "" {
-		stunAddr := stunServer
-		if stunAddr == "" {
-			stunAddr = "stun.l.google.com:19302"
-		}
-		ea, err := DiscoverPublicAddr(stunAddr, 5*time.Second, conn)
+		ea, used, err := DiscoverPublicAddrFallback(stunServer, 6*time.Second, conn)
 		if err == nil {
 			externalAddr = ea
-			v.log("STUN external address: %s", externalAddr)
+			v.log("STUN external address: %s (via %s)", externalAddr, used)
 		} else {
 			v.log("STUN discovery failed: %v (will use server-derived addr)", err)
 		}

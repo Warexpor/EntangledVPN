@@ -96,6 +96,7 @@
       const saved = await window.go.main.App.GetSettings()
       if (saved) {
         cfg = { ...cfg, ...saved }
+        if (!cfg.connectionMode) cfg.connectionMode = 'direct'
         $settings = cfg
         if (cfg.lang) setLang(cfg.lang)
       }
@@ -148,11 +149,14 @@
     <div class="section-title">─── {$t.section_network} ───</div>
     <p class="hint">{$t.advanced_warn}</p>
 
-    <label class="setting-row toggle-row">
-      <span class="setting-label">{$t.p2p_only}</span>
-      <input type="checkbox" bind:checked={cfg.p2pOnly} />
-      <span class="toggle-label">{$t.p2p_only_desc}</span>
-    </label>
+    <div class="setting-row">
+      <label class="setting-label" for="cfg-conn">{$t.connection_mode}</label>
+      <select id="cfg-conn" bind:value={cfg.connectionMode}>
+        <option value="direct">{$t.connection_direct}</option>
+        <option value="relay">{$t.connection_relay}</option>
+      </select>
+    </div>
+    <p class="hint">{$t.connection_mode_desc}</p>
 
     <div class="setting-row">
       <label class="setting-label" for="cfg-mtu">{$t.mtu}</label>

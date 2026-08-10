@@ -17,6 +17,45 @@ const (
 	attrMappedAddr    = 0x0001
 )
 
+// Default STUN servers. Cloudflare first — some networks drop Google STUN (19302).
+var defaultSTUNServers = []string{
+	"stun.cloudflare.com:3478",
+	"stun.l.google.com:19302",
+}
+
+// DiscoverPublicAddrFallback tries configured (if any) then defaultSTUNServers.
+func DiscoverPublicAddrFallback(configured string, timeout time.Duration, conn *net.UDPConn) (string, string, error) {
+	servers := make([]string, 0, 1+len(defaultSTUNServers))
+	if configured != "" {
+		servers = append(servers, configured)
+	}
+	servers = append(servers, defaultSTUNServers...)
+	seen := map[string]bool{}
+	per := timeout
+	if n := len(servers); n > 1 {
+		per = timeout / time.Duration(n)
+		if per < 2*time.Second {
+			per = 2 * time.Second
+		}
+	}
+	var last error
+	for _, s := range servers {
+		if seen[s] {
+			continue
+		}
+		seen[s] = true
+		ea, err := DiscoverPublicAddr(s, per, conn)
+		if err == nil {
+			return ea, s, nil
+		}
+		last = err
+	}
+	if last == nil {
+		last = fmt.Errorf("no stun servers")
+	}
+	return "", "", last
+}
+
 // DiscoverPublicAddr runs a STUN binding request on conn so the mapped port
 // matches the UDP listen port used for P2P/relay.
 func DiscoverPublicAddr(server string, timeout time.Duration, conn *net.UDPConn) (string, error) {

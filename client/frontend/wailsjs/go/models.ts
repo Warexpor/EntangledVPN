@@ -34,7 +34,8 @@ export namespace main {
 	    lastRoomName: string;
 	    lastRoomLocked: boolean;
 	    startWithWindows: boolean;
-	    p2pOnly: boolean;
+	    connectionMode: string;
+	    p2pOnly?: boolean;
 	    mtu: number;
 	    dnsServer: string;
 	    socks5Proxy: string;
@@ -58,6 +59,7 @@ export namespace main {
 	        this.lastRoomName = source["lastRoomName"];
 	        this.lastRoomLocked = source["lastRoomLocked"];
 	        this.startWithWindows = source["startWithWindows"];
+	        this.connectionMode = source["connectionMode"];
 	        this.p2pOnly = source["p2pOnly"];
 	        this.mtu = source["mtu"];
 	        this.dnsServer = source["dnsServer"];

@@ -3,6 +3,7 @@ package vpncore
 import (
 	"encoding/binary"
 	"errors"
+	"hash/fnv"
 	"net"
 	"sync"
 	"time"
@@ -27,11 +28,14 @@ type Peer struct {
 	PublicKey  string    `json:"-"`
 	Connected  bool      `json:"connected"`
 	Ping       int       `json:"ping"`
-	Path       string    `json:"path"` // p2p | relay | ws | ""
+	Path       string    `json:"path"` // p2p | relay | ws | "" — UI / last RTT sample path
 	LastSeen   time.Time `json:"-"`
 	remoteUDP  *net.UDPAddr
-	cipher     *Cipher
-	mu         sync.Mutex
+	candidates []*net.UDPAddr // public + local hole-punch targets
+	// p2pConfirmed: our ping landed on peer via p2p (echo). Safe for exclusive direct sends.
+	p2pConfirmed bool
+	cipher       *Cipher
+	mu           sync.Mutex
 }
 
 type PeerManager struct {
@@ -43,16 +47,24 @@ type PeerManager struct {
 	relay      *RelayClient
 	relayAddr  string
 	localID    string
-	p2pOnly    bool
-	OnPacket   func(fromID string, data []byte)
-	OnStatus   func(id string, connected bool)
-	OnPing     func(id string, ping int)
-	OnChat     func(fromID, nickname, message string, isDM bool)
+	p2pOnly    bool // deprecated: use forceRelay
+	forceRelay bool
+	// Drop duplicate datagrams (same ciphertext via p2p+relay) within a short window.
+	dedupMu sync.Mutex
+	dedup   map[uint64]time.Time
+	OnPacket    func(fromID string, data []byte)
+	OnStatus    func(id string, connected bool)
+	OnPing      func(id string, ping int)
+	OnChat      func(fromID, nickname, message string, isDM bool)
 	SendWSRelay func(toID string, data []byte) error
 }
 
 func NewPeerManager() *PeerManager {
-	return &PeerManager{peers: make(map[string]*Peer), stop: make(chan struct{})}
+	return &PeerManager{
+		peers: make(map[string]*Peer),
+		stop:  make(chan struct{}),
+		dedup: make(map[uint64]time.Time),
+	}
 }
 
 func (pm *PeerManager) SetLocalID(id string) {
@@ -67,10 +79,12 @@ func (pm *PeerManager) GetLocalID() string {
 	return pm.localID
 }
 
-func (pm *PeerManager) SetP2POnly(enabled bool) {
+// SetForceRelay: true = send only via server relay (skip P2P). false = prefer direct.
+func (pm *PeerManager) SetForceRelay(enabled bool) {
 	pm.mu.Lock()
 	defer pm.mu.Unlock()
-	pm.p2pOnly = enabled
+	pm.forceRelay = enabled
+	pm.p2pOnly = false
 }
 
 func (pm *PeerManager) Start(conn *net.UDPConn) {
@@ -126,6 +140,8 @@ func (pm *PeerManager) RemovePeer(id string) {
 		p.mu.Lock()
 		p.Connected = false
 		p.remoteUDP = nil
+		p.candidates = nil
+		p.p2pConfirmed = false
 		p.cipher = nil
 		p.mu.Unlock()
 		delete(pm.peers, id)
@@ -142,6 +158,8 @@ func (pm *PeerManager) Clear() {
 		p.mu.Lock()
 		p.Connected = false
 		p.remoteUDP = nil
+		p.candidates = nil
+		p.p2pConfirmed = false
 		p.cipher = nil
 		p.mu.Unlock()
 		notifications = append(notifications, id)
@@ -184,17 +202,44 @@ func (pm *PeerManager) GetPeers() []*Peer {
 }
 
 func (pm *PeerManager) ConnectToPeer(id string, addr *net.UDPAddr, cipher *Cipher) error {
+	if addr == nil {
+		return nil
+	}
+	return pm.ConnectToPeerAddrs(id, []*net.UDPAddr{addr}, cipher)
+}
+
+// ConnectToPeerAddrs stores hole-punch candidates (public then local). Path stays
+// unproven until a pong arrives via p2p.
+func (pm *PeerManager) ConnectToPeerAddrs(id string, addrs []*net.UDPAddr, cipher *Cipher) error {
 	p := pm.GetPeer(id)
 	if p == nil {
 		return nil
 	}
+	uniq := make([]*net.UDPAddr, 0, len(addrs))
+	seen := map[string]bool{}
+	for _, a := range addrs {
+		if a == nil || a.Port == 0 {
+			continue
+		}
+		k := a.String()
+		if seen[k] {
+			continue
+		}
+		seen[k] = true
+		uniq = append(uniq, a)
+	}
 	p.mu.Lock()
 	defer p.mu.Unlock()
-	if addr != nil {
-		p.remoteUDP = addr
-		p.Path = "p2p"
+	if len(uniq) > 0 {
+		p.candidates = uniq
+		p.remoteUDP = uniq[0]
+		if p.Path == "" || p.Path == "relay" || p.Path == "ws" {
+			// aspirational until pong; UI may still show relay until proven
+		}
 	}
-	p.cipher = cipher
+	if cipher != nil {
+		p.cipher = cipher
+	}
 	p.Connected = true
 	p.LastSeen = time.Now()
 	if pm.OnStatus != nil {
@@ -295,6 +340,31 @@ func (pm *PeerManager) HandleRelayPacket(data []byte) {
 	pm.processPeerPayload(srcVIP, data[1+srcVipLen:], true)
 }
 
+func (pm *PeerManager) duplicatePayload(srcVIP string, payload []byte) bool {
+	h := fnv.New64a()
+	_, _ = h.Write([]byte(srcVIP))
+	_, _ = h.Write(payload)
+	key := h.Sum64()
+	now := time.Now()
+	pm.dedupMu.Lock()
+	defer pm.dedupMu.Unlock()
+	if pm.dedup == nil {
+		pm.dedup = make(map[uint64]time.Time)
+	}
+	if t, ok := pm.dedup[key]; ok && now.Sub(t) < 2*time.Second {
+		return true
+	}
+	pm.dedup[key] = now
+	if len(pm.dedup) > 256 {
+		for k, t := range pm.dedup {
+			if now.Sub(t) > 2*time.Second {
+				delete(pm.dedup, k)
+			}
+		}
+	}
+	return false
+}
+
 func (pm *PeerManager) processPeerPayload(srcVIP string, payload []byte, isRelay bool) {
 	p := pm.GetPeerByIP(srcVIP)
 	if p == nil {
@@ -308,6 +378,10 @@ func (pm *PeerManager) processPeerPayload(srcVIP string, payload []byte, isRelay
 	pktLen := int(binary.BigEndian.Uint16(payload[:2]))
 	if pktLen+2 > len(payload) {
 		Logger.Printf("processPeerPayload: pktLen %d exceeds payload %d from %s (%s)", pktLen, len(payload), p.ID, p.Nickname)
+		return
+	}
+	// Same encrypted datagram often arrives on both p2p and relay while punching.
+	if pm.duplicatePayload(srcVIP, payload[:2+pktLen]) {
 		return
 	}
 	p.mu.Lock()
@@ -345,7 +419,7 @@ func (pm *PeerManager) processPeerPayload(srcVIP string, payload []byte, isRelay
 			copy(ts, plaintext[1:9])
 			p.mu.Unlock()
 			Logger.Printf("ping received [%s] from %s (%s)", source, id, nickname)
-			pm.sendPong(p, ts)
+			pm.sendPong(p, ts, isRelay)
 		} else {
 			p.mu.Unlock()
 		}
@@ -363,12 +437,38 @@ func (pm *PeerManager) processPeerPayload(srcVIP string, payload []byte, isRelay
 			if !isRelay {
 				source = "p2p"
 			}
+			// byte9 = how the peer received our ping: 0=p2p, 1=relay (1.2.6+)
+			pingVia := byte(0xff)
+			if len(plaintext) >= 10 {
+				pingVia = plaintext[9]
+			}
 			id := p.ID
 			nickname := p.Nickname
 			p.Ping = pingMs
-			p.Path = source
+			if pingVia == 0 {
+				p.p2pConfirmed = true
+			}
+			// UI path follows the RTT sample: a p2p-delivered pong (~30ms) is Direct
+			// even when ping_via=relay (mixed path). Exclusive sends still need p2pConfirmed.
+			switch {
+			case !isRelay || pingVia == 0:
+				p.Path = "p2p"
+			case p.Path != "p2p":
+				if source == "ws" {
+					p.Path = "ws"
+				} else {
+					p.Path = "relay"
+				}
+			}
 			p.mu.Unlock()
-			Logger.Printf("pong received [%s] from %s (%s): %dms", source, id, nickname, pingMs)
+			via := "unknown"
+			switch pingVia {
+			case 0:
+				via = "p2p"
+			case 1:
+				via = "relay"
+			}
+			Logger.Printf("pong received [%s] from %s (%s): %dms (ping_via=%s)", source, id, nickname, pingMs, via)
 			if pm.OnPing != nil {
 				pm.OnPing(id, pingMs)
 			}
@@ -417,9 +517,25 @@ func (pm *PeerManager) findPeerByAddr(addr string) *Peer {
 		if peer.remoteUDP != nil {
 			match = peer.remoteUDP.String() == addr || peer.remoteUDP.IP.String() == host
 			if match && peer.remoteUDP.String() != addr {
-				// NAT rebound: remember the live source port
 				if a, err := net.ResolveUDPAddr("udp", addr); err == nil {
 					peer.remoteUDP = a
+					// Keep learned mapping in the candidate set for later sends.
+					peer.candidates = prependCandidate(peer.candidates, a)
+				}
+			}
+		}
+		if !match {
+			for _, c := range peer.candidates {
+				if c == nil {
+					continue
+				}
+				if c.String() == addr || c.IP.String() == host {
+					match = true
+					if a, err := net.ResolveUDPAddr("udp", addr); err == nil {
+						peer.remoteUDP = a
+						peer.candidates = prependCandidate(peer.candidates, a)
+					}
+					break
 				}
 			}
 		}
@@ -429,6 +545,22 @@ func (pm *PeerManager) findPeerByAddr(addr string) *Peer {
 		}
 	}
 	return nil
+}
+
+func prependCandidate(cands []*net.UDPAddr, a *net.UDPAddr) []*net.UDPAddr {
+	if a == nil {
+		return cands
+	}
+	out := make([]*net.UDPAddr, 0, 1+len(cands))
+	out = append(out, a)
+	k := a.String()
+	for _, c := range cands {
+		if c == nil || c.String() == k {
+			continue
+		}
+		out = append(out, c)
+	}
+	return out
 }
 
 func (pm *PeerManager) SetRelayClient(r *RelayClient) {
@@ -446,7 +578,7 @@ func (pm *PeerManager) SetRelayClient(r *RelayClient) {
 func (pm *PeerManager) sendPlaintext(p *Peer, plaintext []byte) error {
 	// Capture PeerManager shared state under read lock before locking p.mu
 	pm.mu.RLock()
-	p2pOnly := pm.p2pOnly
+	forceRelay := pm.forceRelay
 	sharedConn := pm.sharedConn
 	sendWSRelay := pm.SendWSRelay
 	relay := pm.relay
@@ -465,32 +597,68 @@ func (pm *PeerManager) sendPlaintext(p *Peer, plaintext []byte) error {
 		return err
 	}
 	remoteUDP := p.remoteUDP
+	cands := append([]*net.UDPAddr(nil), p.candidates...)
 	vip := p.VirtualIP
 	id := p.ID
 	neverPonged := p.Ping < 0
 	path := p.Path
+	p2pConfirmed := p.p2pConfirmed
 	p.mu.Unlock()
 
 	pkt := make([]byte, 2+len(encrypted))
 	binary.BigEndian.PutUint16(pkt[:2], uint16(len(encrypted)))
 	copy(pkt[2:], encrypted)
 
-	// P2P WriteToUDP "success" only means the kernel accepted the datagram — not that
-	// NAT delivered it. XOR-return only after a pong proved the direct path.
-	provenP2P := !neverPonged && path == "p2p"
-	if remoteUDP != nil && sharedConn != nil {
-		if _, err := sharedConn.WriteToUDP(pkt, remoteUDP); err == nil {
-			if provenP2P {
+	probe := len(plaintext) > 0 && (plaintext[0] == msgTypePing || plaintext[0] == msgTypePong)
+	// Exclusive P2P only when peer echoed that our ping arrived via p2p — not merely
+	// when Path shows Direct from a mixed-path RTT sample.
+	provenP2P := !neverPonged && p2pConfirmed && !forceRelay
+
+	writeP2P := func(allCandidates bool) bool {
+		if sharedConn == nil {
+			return false
+		}
+		targets := make([]*net.UDPAddr, 0, 1+len(cands))
+		seen := map[string]bool{}
+		add := func(a *net.UDPAddr) {
+			if a == nil || a.Port == 0 {
+				return
+			}
+			k := a.String()
+			if seen[k] {
+				return
+			}
+			seen[k] = true
+			targets = append(targets, a)
+		}
+		add(remoteUDP)
+		if allCandidates {
+			for _, a := range cands {
+				add(a)
+			}
+		}
+		ok := false
+		for _, addr := range targets {
+			if _, err := sharedConn.WriteToUDP(pkt, addr); err == nil {
+				ok = true
+			}
+		}
+		return ok
+	}
+
+	if !forceRelay {
+		if provenP2P {
+			if writeP2P(false) {
 				pm.setPeerPath(p, "p2p")
 				return nil
 			}
-			// Unproven / relay-proven: still poke P2P for hole punch, then fall through.
+			// Direct write failed — fall through to relay.
+		} else if probe {
+			// Hole-punch probes spray candidates; relay keeps session alive until proven.
+			_ = writeP2P(true)
 		}
 	}
-
-	if p2pOnly {
-		return errors.New("p2p-only: no direct path")
-	}
+	// App data while unproven / force-relay: relay/WS only (no dual-send → no doubled chat).
 
 	relayOK := false
 	if vip != "" && relay != nil {
@@ -510,11 +678,19 @@ func (pm *PeerManager) sendPlaintext(p *Peer, plaintext []byte) error {
 	}
 
 	if relayOK {
-		pm.setPeerPath(p, "relay")
+		if forceRelay || (!probe && path != "p2p") {
+			pm.setPeerPath(p, "relay")
+		}
 		return nil
 	}
 	if wsOK {
-		pm.setPeerPath(p, "ws")
+		if forceRelay || (!probe && path != "p2p") {
+			pm.setPeerPath(p, "ws")
+		}
+		return nil
+	}
+	if probe && !forceRelay {
+		// Optimistic hole-punch with no relay yet.
 		return nil
 	}
 	return errors.New("no transport path available")
@@ -572,13 +748,18 @@ func (pm *PeerManager) sendPing(p *Peer) {
 	pm.sendPlaintext(p, data)
 }
 
-func (pm *PeerManager) sendPong(p *Peer, ts []byte) {
+func (pm *PeerManager) sendPong(p *Peer, ts []byte, pingViaRelay bool) {
 	if len(ts) != 8 {
 		return
 	}
-	data := make([]byte, 9)
+	data := make([]byte, 10)
 	data[0] = msgTypePong
-	copy(data[1:], ts)
+	copy(data[1:9], ts)
+	if pingViaRelay {
+		data[9] = 1
+	} else {
+		data[9] = 0
+	}
 
 	pm.sendPlaintext(p, data)
 }

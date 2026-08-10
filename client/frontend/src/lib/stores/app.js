@@ -5,7 +5,7 @@ export const MAX_MESSAGES = 500
 export const settings = writable({
   serverAddr: '', nickname: '', autoConnect: false,
   autoJoinLastRoom: false, startWithWindows: false,
-  p2pOnly: false, mtu: 1500,
+  connectionMode: 'direct', mtu: 1500,
   dnsServer: '', socks5Proxy: '', stunServer: 'stun.l.google.com:19302',
   uiScale: 100, theme: 'dark',
   lang: 'en', serverToken: '',

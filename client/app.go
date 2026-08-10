@@ -21,7 +21,8 @@ type ClientConfig struct {
 	LastRoomName     string `json:"lastRoomName"`
 	LastRoomLocked   bool   `json:"lastRoomLocked"` // room needs password; password itself is never on disk
 	StartWithWindows bool   `json:"startWithWindows"`
-	P2POnly          bool   `json:"p2pOnly"`
+	ConnectionMode   string `json:"connectionMode"` // "direct" (default) | "relay"
+	P2POnly          bool   `json:"p2pOnly,omitempty"` // legacy; migrated to connectionMode
 	MTU              int    `json:"mtu"`
 	DNSServer        string `json:"dnsServer"`
 	SOCKS5Proxy      string `json:"socks5Proxy"`
@@ -50,7 +51,7 @@ func defaultConfig() ClientConfig {
 		AutoConnect:      false,
 		AutoJoinLastRoom: false,
 		StartWithWindows: false,
-		P2POnly:          false,
+		ConnectionMode:   "direct",
 		MTU:              1500,
 		DNSServer:        "",
 		SOCKS5Proxy:      "",
@@ -284,6 +285,19 @@ func statusFrom(s vpncore.ConnectionStatus) AppStatus {
 	}
 }
 
+func normalizeConnectionMode(mode string) string {
+	switch strings.ToLower(strings.TrimSpace(mode)) {
+	case "relay":
+		return "relay"
+	default:
+		return "direct"
+	}
+}
+
+func (c ClientConfig) ForceRelay() bool {
+	return normalizeConnectionMode(c.ConnectionMode) == "relay"
+}
+
 func (a *App) LoadConfig() ClientConfig {
 	data, err := os.ReadFile(configPath())
 	if err != nil {
@@ -300,6 +314,13 @@ func (a *App) LoadConfig() ClientConfig {
 	if cfg.UiScale > 150 {
 		cfg.UiScale = 150
 	}
+	if cfg.ConnectionMode == "" {
+		// Legacy p2pOnly meant "no relay"; new model is direct-vs-relay. Both map to direct
+		// preference (direct still falls back to relay when NAT needs it).
+		cfg.ConnectionMode = "direct"
+	}
+	cfg.ConnectionMode = normalizeConnectionMode(cfg.ConnectionMode)
+	cfg.P2POnly = false
 	return cfg
 }
 
@@ -339,6 +360,8 @@ func (a *App) SaveSettings(cfg ClientConfig) bool {
 		cfg.UiScale = 150
 	}
 	cfg.FontSize = 0 // stop rewriting legacy field
+	cfg.ConnectionMode = normalizeConnectionMode(cfg.ConnectionMode)
+	cfg.P2POnly = false
 	a.SaveConfig(cfg)
 	if old.StartWithWindows != cfg.StartWithWindows {
 		a.SetStartWithWindows(cfg.StartWithWindows)
@@ -349,7 +372,7 @@ func (a *App) SaveSettings(cfg ClientConfig) bool {
 	a.mu.Unlock()
 	needsReconnect := false
 	if vpn != nil {
-		vpn.SetP2POnly(cfg.P2POnly)
+		vpn.SetForceRelay(cfg.ForceRelay())
 		vpn.ApplyTUNSettings(cfg.MTU, cfg.DNSServer)
 		if old.SOCKS5Proxy != cfg.SOCKS5Proxy || old.STUNServer != cfg.STUNServer || old.ServerToken != cfg.ServerToken {
 			needsReconnect = true
@@ -398,7 +421,7 @@ func (a *App) ResetSettings() ClientConfig {
 	vpn := a.vpn
 	a.mu.Unlock()
 	if vpn != nil {
-		vpn.SetP2POnly(cfg.P2POnly)
+		vpn.SetForceRelay(cfg.ForceRelay())
 		vpn.ApplyTUNSettings(cfg.MTU, cfg.DNSServer)
 	}
 	return cfg
@@ -420,7 +443,7 @@ func (a *App) Connect(serverAddr, nickname string) (AppStatus, error) {
 	vpnCfg := &vpncore.VPNConfig{
 		ServerAddr: serverAddr,
 		Nickname:   nickname,
-		P2POnly:    cfg.P2POnly,
+		ForceRelay: cfg.ForceRelay(),
 		STUNServer: cfg.STUNServer,
 		MTU:        cfg.MTU,
 		DNSServer:  cfg.DNSServer,
@@ -428,7 +451,7 @@ func (a *App) Connect(serverAddr, nickname string) (AppStatus, error) {
 		AuthToken:  cfg.ServerToken,
 	}
 	a.vpn = vpncore.NewVPNCore(vpnCfg)
-	a.vpn.SetP2POnly(cfg.P2POnly)
+	a.vpn.SetForceRelay(cfg.ForceRelay())
 	for _, r := range a.loadRoomsRaw() {
 		if r.OwnerToken != "" {
 			a.vpn.SetOwnerToken(r.Name, r.OwnerToken)
