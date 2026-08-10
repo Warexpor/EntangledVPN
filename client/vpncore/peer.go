@@ -468,17 +468,23 @@ func (pm *PeerManager) sendPlaintext(p *Peer, plaintext []byte) error {
 	vip := p.VirtualIP
 	id := p.ID
 	neverPonged := p.Ping < 0
+	path := p.Path
 	p.mu.Unlock()
 
 	pkt := make([]byte, 2+len(encrypted))
 	binary.BigEndian.PutUint16(pkt[:2], uint16(len(encrypted)))
 	copy(pkt[2:], encrypted)
 
-	// Try P2P first (lowest latency when NAT allows). On success: XOR — do not also relay.
+	// P2P WriteToUDP "success" only means the kernel accepted the datagram — not that
+	// NAT delivered it. XOR-return only after a pong proved the direct path.
+	provenP2P := !neverPonged && path == "p2p"
 	if remoteUDP != nil && sharedConn != nil {
 		if _, err := sharedConn.WriteToUDP(pkt, remoteUDP); err == nil {
-			pm.setPeerPath(p, "p2p")
-			return nil
+			if provenP2P {
+				pm.setPeerPath(p, "p2p")
+				return nil
+			}
+			// Unproven / relay-proven: still poke P2P for hole punch, then fall through.
 		}
 	}
 
@@ -493,7 +499,7 @@ func (pm *PeerManager) sendPlaintext(p *Peer, plaintext []byte) error {
 		}
 	}
 
-	// WS only when UDP paths fail, or until first pong (no P2P path above).
+	// WS when UDP relay fails, or until first pong (helps before relay REG completes).
 	wsOK := false
 	if sendWSRelay != nil && (!relayOK || neverPonged) {
 		if err := sendWSRelay(id, pkt); err == nil {

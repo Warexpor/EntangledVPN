@@ -340,9 +340,9 @@ func (h *Hub) JoinRoom(name, password, ownerToken string, client *Client) {
 	client.mu.Unlock()
 
 	type existingData struct {
-		ID, VirtualIP, LocalAddr, PublicKey string
-		PublicIP                            net.IP
-		ExternalAddr                        string
+		ID, VirtualIP, LocalAddr, PublicKey, Crypto string
+		PublicIP                                    net.IP
+		ExternalAddr                                string
 	}
 	existingList := make([]existingData, 0, len(room.Clients))
 	for _, existing := range room.Clients {
@@ -357,6 +357,7 @@ func (h *Hub) JoinRoom(name, password, ownerToken string, client *Client) {
 			PublicKey:    existing.PublicKey,
 			PublicIP:     existing.PublicIP,
 			ExternalAddr: existing.ExternalAddr,
+			Crypto:       existing.Crypto,
 		})
 		existing.mu.Unlock()
 	}
@@ -380,13 +381,17 @@ func (h *Hub) JoinRoom(name, password, ownerToken string, client *Client) {
 
 	for _, ed := range existingList {
 		publicAddr := choosePublicAddr(ed.PublicIP, ed.ExternalAddr, ed.LocalAddr)
-		client.sendMessage("peer_updated", mustMarshal(map[string]string{
+		payload := map[string]string{
 			"id":          ed.ID,
 			"virtual_ip":  ed.VirtualIP,
 			"local_addr":  ed.LocalAddr,
 			"public_addr": publicAddr,
 			"public_key":  ed.PublicKey,
-		}))
+		}
+		if ed.Crypto != "" {
+			payload["crypto"] = ed.Crypto
+		}
+		client.sendMessage("peer_updated", mustMarshal(payload))
 	}
 
 	peers := room.GetPeersList(client.ID)

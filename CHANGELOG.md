@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+## 1.2.1 — 2026-08-10
+
+### Fixed
+
+- P2P send no longer XOR-returns on bare `WriteToUDP` success before a pong proves the path; unproven/relay-proven peers keep using relay (hole-punch still attempted)
+- Join-time `peer_updated` for existing peers includes `crypto` when known
+
 ## 1.2.0 — 2026-08-09
 
 ### Added
