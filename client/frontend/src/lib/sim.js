@@ -1,5 +1,6 @@
 import { get } from 'svelte/store'
 import { status, view, peers, settings, addChatMessage } from './stores/app.js'
+import { setLang } from './locales/index.js'
 
 const SIM = import.meta.env.DEV && !window.go
 const jumpConnected = SIM && new URLSearchParams(location.search).has('connected')
@@ -193,6 +194,7 @@ if (SIM) {
   }
 
   settings.set({ ...cfg })
+  if (cfg.lang) setLang(cfg.lang)
   if (jumpConnected) {
     document.documentElement.setAttribute('data-app', 'connected')
     enterConnected('nightwatch')
