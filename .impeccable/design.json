@@ -1,0 +1,290 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-08-21T19:47:00.000Z",
+  "title": "Design System: Entangled VPN — Connected Shell",
+  "extensions": {
+    "colorMeta": {
+      "bg": {
+        "role": "neutral",
+        "displayName": "Bench Black",
+        "canonical": "#0a0a0a",
+        "tonalRamp": ["#0a0a0a", "#141414", "#1a1a1a", "#222222", "#2a2a2a", "#3a3a3a", "#5c5c5c", "#8a8a8a"]
+      },
+      "surface": {
+        "role": "neutral",
+        "displayName": "Panel Surface",
+        "canonical": "#141414",
+        "tonalRamp": ["#0a0a0a", "#111111", "#141414", "#1a1a1a", "#222222", "#2a2a2a", "#3a3a3a", "#5c5c5c"]
+      },
+      "surface-2": {
+        "role": "neutral",
+        "displayName": "Raised Surface",
+        "canonical": "#1a1a1a",
+        "tonalRamp": ["#0a0a0a", "#141414", "#1a1a1a", "#222222", "#262626", "#2a2a2a", "#3a3a3a", "#5c5c5c"]
+      },
+      "border": {
+        "role": "neutral",
+        "displayName": "Structure Border",
+        "canonical": "#2a2a2a",
+        "tonalRamp": ["#0a0a0a", "#141414", "#1a1a1a", "#222222", "#262626", "#2a2a2a", "#3a3a3a", "#5c5c5c"]
+      },
+      "hairline": {
+        "role": "neutral",
+        "displayName": "Hairline",
+        "canonical": "#3a3a3a",
+        "tonalRamp": ["#141414", "#1a1a1a", "#222222", "#262626", "#2a2a2a", "#3a3a3a", "#5c5c5c", "#8a8a8a"]
+      },
+      "muted": {
+        "role": "neutral",
+        "displayName": "Muted Label",
+        "canonical": "#8a8a8a",
+        "tonalRamp": ["#2a2a2a", "#3a3a3a", "#5c5c5c", "#6e6e6e", "#8a8a8a", "#a3a3a3", "#c8c8c8", "#f5f5f5"]
+      },
+      "text": {
+        "role": "neutral",
+        "displayName": "Readout Text",
+        "canonical": "#f5f5f5",
+        "tonalRamp": ["#111111", "#2a2a2a", "#5c5c5c", "#8a8a8a", "#a3a3a3", "#c8c8c8", "#e8e8e8", "#f5f5f5"]
+      },
+      "text-dim": {
+        "role": "neutral",
+        "displayName": "Dim Trace",
+        "canonical": "#5c5c5c",
+        "tonalRamp": ["#0a0a0a", "#141414", "#1a1a1a", "#222222", "#2a2a2a", "#3a3a3a", "#5c5c5c", "#8a8a8a"]
+      },
+      "cta-fill": {
+        "role": "primary",
+        "displayName": "Bench White",
+        "canonical": "#ffffff",
+        "tonalRamp": ["#0a0a0a", "#2a2a2a", "#5c5c5c", "#8a8a8a", "#b8b8b8", "#d4d4d4", "#eeeeee", "#ffffff"]
+      },
+      "cta-ink": {
+        "role": "primary",
+        "displayName": "CTA Ink",
+        "canonical": "#0a0a0a",
+        "tonalRamp": ["#0a0a0a", "#111111", "#141414", "#1a1a1a", "#222222", "#2a2a2a", "#3a3a3a", "#5c5c5c"]
+      },
+      "live": {
+        "role": "secondary",
+        "displayName": "Live Green",
+        "canonical": "#2fbf62",
+        "tonalRamp": ["#0d3319", "#145c2a", "#1a8f45", "#228f4a", "#2fbf62", "#4fd17a", "#7ee0a0", "#c8f5d8"]
+      },
+      "fault": {
+        "role": "tertiary",
+        "displayName": "Fault Red",
+        "canonical": "#e23d3d",
+        "tonalRamp": ["#3d0a0a", "#6e1414", "#9e1e1e", "#c41e1e", "#e23d3d", "#e86a6a", "#f09999", "#f5cccc"]
+      },
+      "graticule": {
+        "role": "neutral",
+        "displayName": "Graticule Line",
+        "canonical": "#262626",
+        "tonalRamp": ["#0a0a0a", "#111111", "#141414", "#1a1a1a", "#222222", "#262626", "#2a2a2a", "#3a3a3a"]
+      }
+    },
+    "typographyMeta": {
+      "display": {
+        "displayName": "Wordmark",
+        "purpose": "Topbar brand cell — uppercase tracked bench label."
+      },
+      "headline": {
+        "displayName": "Section Headline",
+        "purpose": "Channels, Chat, Settings pane titles."
+      },
+      "title": {
+        "displayName": "Card Title",
+        "purpose": "Settings disclosure section headers."
+      },
+      "body": {
+        "displayName": "Body",
+        "purpose": "Hints, toggles, composer textarea."
+      },
+      "label": {
+        "displayName": "Tracked Label",
+        "purpose": "Readout captions and column headers via .label-track."
+      },
+      "mono": {
+        "displayName": "Mono Readout",
+        "purpose": "VIP, IPs, ping, path labels, chat transcript."
+      }
+    },
+    "shadows": [
+      {
+        "name": "overlay-menu",
+        "value": "0 8px 24px rgba(0, 0, 0, 0.28)",
+        "purpose": "Sidebar overflow menus only — functional overlay elevation."
+      },
+      {
+        "name": "overlay-modal",
+        "value": "0 12px 40px rgba(0, 0, 0, 0.28)",
+        "purpose": "Create/join network dialogs — functional overlay elevation."
+      }
+    ],
+    "motion": [
+      {
+        "name": "ease-out",
+        "value": "cubic-bezier(0.16, 1, 0.3, 1)",
+        "purpose": "Default outgoing transitions — buttons, borders, chevrons."
+      },
+      {
+        "name": "ease-inout",
+        "value": "cubic-bezier(0.4, 0, 0.2, 1)",
+        "purpose": "Balanced transitions where specified."
+      },
+      {
+        "name": "dur-fast",
+        "value": "150ms",
+        "purpose": "Row hover, sidebar tick feedback."
+      },
+      {
+        "name": "dur-mid",
+        "value": "280ms",
+        "purpose": "Button and border state changes."
+      },
+      {
+        "name": "dur-slow",
+        "value": "420ms",
+        "purpose": "Card body collapse animation."
+      }
+    ],
+    "breakpoints": [
+      {
+        "name": "peer-collapse",
+        "value": "720px",
+        "purpose": "Peer graticule hides IP, path, ping columns."
+      }
+    ]
+  },
+  "components": [
+    {
+      "name": "Default Button",
+      "kind": "button",
+      "refersTo": "button-default",
+      "description": "Standard bordered bench control for secondary actions.",
+      "html": "<button class=\"ds-btn-default\" type=\"button\">Cancel</button>",
+      "css": ".ds-btn-default { border: 1px solid var(--border, #2a2a2a); background: transparent; color: var(--text, #f5f5f5); padding: 8px 14px; min-height: 36px; border-radius: 2px; cursor: pointer; font-weight: 500; font-size: 13px; font-family: 'Bricolage Grotesque', 'Segoe UI', sans-serif; transition: background 280ms cubic-bezier(0.16, 1, 0.3, 1), border-color 280ms cubic-bezier(0.16, 1, 0.3, 1), color 280ms cubic-bezier(0.16, 1, 0.3, 1); } .ds-btn-default:hover:not(:disabled) { border-color: var(--hairline, #3a3a3a); background: var(--surface-2, #1a1a1a); } .ds-btn-default:focus-visible { outline: 2px solid var(--text, #f5f5f5); outline-offset: 2px; } .ds-btn-default:disabled { opacity: 0.45; cursor: not-allowed; }"
+    },
+    {
+      "name": "Ghost Button",
+      "kind": "button",
+      "refersTo": "button-ghost",
+      "description": "Muted inline action in peer row and compact contexts.",
+      "html": "<button class=\"ds-btn-ghost\" type=\"button\">Ping</button>",
+      "css": ".ds-btn-ghost { border: 1px solid var(--border, #2a2a2a); background: transparent; color: var(--muted, #8a8a8a); padding: 4px 10px; min-height: 28px; border-radius: 2px; cursor: pointer; font-weight: 500; font-size: 12px; font-family: 'Bricolage Grotesque', 'Segoe UI', sans-serif; transition: color 280ms cubic-bezier(0.16, 1, 0.3, 1); } .ds-btn-ghost:hover:not(:disabled) { color: var(--text, #f5f5f5); } .ds-btn-ghost:focus-visible { outline: 2px solid var(--text, #f5f5f5); outline-offset: 2px; }"
+    },
+    {
+      "name": "CTA Button",
+      "kind": "button",
+      "refersTo": "button-cta",
+      "description": "Primary commit — send message, save, create/join confirm.",
+      "html": "<button class=\"ds-btn-cta\" type=\"button\">Send</button>",
+      "css": ".ds-btn-cta { background: var(--cta-fill, #ffffff); color: var(--cta-ink, #0a0a0a); border: 1px solid var(--cta-fill, #ffffff); padding: 8px 14px; min-height: 36px; border-radius: 2px; cursor: pointer; font-weight: 600; font-size: 13px; font-family: 'Bricolage Grotesque', 'Segoe UI', sans-serif; transition: background 280ms cubic-bezier(0.16, 1, 0.3, 1); } .ds-btn-cta:hover:not(:disabled) { background: color-mix(in srgb, var(--cta-fill, #ffffff) 88%, var(--cta-ink, #0a0a0a)); } .ds-btn-cta:focus-visible { outline: 2px solid var(--text, #f5f5f5); outline-offset: 2px; } .ds-btn-cta:disabled { opacity: 0.45; cursor: not-allowed; }"
+    },
+    {
+      "name": "Bezel Chrome Button",
+      "kind": "button",
+      "refersTo": "bezel",
+      "description": "Uppercase chrome control for settings, disconnect, and panel actions.",
+      "html": "<button class=\"ds-bezel\" type=\"button\">Settings</button>",
+      "css": ".ds-bezel { border: 1px solid var(--border, #2a2a2a); background: transparent; color: var(--text, #f5f5f5); min-height: 32px; padding: 4px 10px; border-radius: 2px; font-size: 11px; font-weight: 500; letter-spacing: 0.08em; text-transform: uppercase; cursor: pointer; font-family: 'Bricolage Grotesque', 'Segoe UI', sans-serif; transition: background 280ms cubic-bezier(0.16, 1, 0.3, 1), border-color 280ms cubic-bezier(0.16, 1, 0.3, 1); } .ds-bezel:hover:not(:disabled) { border-color: var(--hairline, #3a3a3a); background: var(--surface-2, #1a1a1a); } .ds-bezel.active, .ds-bezel.ds-bezel-active { background: var(--text, #f5f5f5); color: var(--bg, #0a0a0a); border-color: var(--text, #f5f5f5); } .ds-bezel:focus-visible { outline: 2px solid var(--text, #f5f5f5); outline-offset: 2px; }"
+    },
+    {
+      "name": "Mono Input Field",
+      "kind": "input",
+      "refersTo": "button-default",
+      "description": "Settings and modal text field — mono values on bench black fill.",
+      "html": "<label class=\"ds-field-label\" for=\"ds-server\">Server</label><input class=\"ds-input\" id=\"ds-server\" type=\"text\" placeholder=\"vps.example.com:8080\" />",
+      "css": ".ds-field-label { display: block; font-size: 12px; font-weight: 600; color: var(--muted, #8a8a8a); margin-bottom: 4px; font-family: 'Bricolage Grotesque', 'Segoe UI', sans-serif; } .ds-input { width: 100%; background: var(--bg, #0a0a0a); border: 1px solid var(--border, #2a2a2a); border-radius: 2px; color: var(--text, #f5f5f5); padding: 8px 10px; min-height: 36px; font-size: 13px; font-family: 'IBM Plex Mono', Consolas, monospace; box-sizing: border-box; } .ds-input:focus-visible { outline: 2px solid var(--text, #f5f5f5); outline-offset: 2px; } .ds-input.ds-invalid { border-color: var(--fault, #e23d3d); }"
+    },
+    {
+      "name": "Readout Label Track",
+      "kind": "custom",
+      "refersTo": "bezel",
+      "description": "Tracked uppercase caption paired with mono readout values in topbar cells.",
+      "html": "<div class=\"ds-readout-cell\"><span class=\"ds-label-track\">Virtual IP</span><span class=\"ds-cell-value\">10.242.0.42</span></div>",
+      "css": ".ds-readout-cell { display: flex; flex-direction: column; gap: 4px; padding: 10px 16px; border-right: 1px solid var(--border, #2a2a2a); } .ds-label-track { display: block; font-size: 10px; font-weight: 500; letter-spacing: 0.14em; text-transform: uppercase; color: var(--muted, #8a8a8a); line-height: 1.2; font-family: 'Bricolage Grotesque', 'Segoe UI', sans-serif; } .ds-cell-value { font-size: 1.35rem; font-weight: 500; letter-spacing: 0.02em; color: var(--text, #f5f5f5); font-family: 'IBM Plex Mono', Consolas, monospace; line-height: 1.15; }"
+    },
+    {
+      "name": "Path LED Cluster",
+      "kind": "custom",
+      "refersTo": "bezel",
+      "description": "Three-lamp path indicator with 7-segment quality bar — live/fault/idle semantics.",
+      "html": "<div class=\"ds-path-readout\"><span class=\"ds-label-track\">Path</span><div class=\"ds-path-row\"><span class=\"ds-leds\"><span class=\"ds-led ds-led-live ds-on\"></span><span class=\"ds-led ds-led-fault\"></span><span class=\"ds-led ds-led-idle\"></span></span><span class=\"ds-path-value ds-live\">Direct</span></div><div class=\"ds-seg-bar\"><span class=\"ds-seg ds-on ds-live\"></span><span class=\"ds-seg ds-on ds-live\"></span><span class=\"ds-seg ds-on ds-live\"></span><span class=\"ds-seg ds-on ds-live\"></span><span class=\"ds-seg ds-on ds-live\"></span><span class=\"ds-seg ds-on ds-live\"></span><span class=\"ds-seg ds-on ds-live\"></span></div></div>",
+      "css": ".ds-path-readout { display: flex; flex-direction: column; gap: 4px; } .ds-path-row { display: flex; align-items: center; gap: 8px; } .ds-leds { display: flex; gap: 4px; } .ds-led { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; background: var(--text-dim, #5c5c5c); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--text, #f5f5f5) 18%, transparent); } .ds-led.ds-on.ds-led-live { background: var(--live, #2fbf62); } .ds-led.ds-on.ds-led-fault { background: var(--fault, #e23d3d); } .ds-led.ds-on.ds-led-idle { background: var(--text, #f5f5f5); } .ds-path-value { font-family: 'IBM Plex Mono', Consolas, monospace; font-size: 1.22rem; font-weight: 500; } .ds-path-value.ds-live { color: var(--live, #2fbf62); } .ds-path-value.ds-fault { color: var(--fault, #e23d3d); } .ds-seg-bar { display: flex; gap: 3px; margin-top: 2px; } .ds-seg { flex: 1; height: 3px; background: var(--text-dim, #5c5c5c); } .ds-seg.ds-on.ds-live { background: var(--live, #2fbf62); } .ds-seg.ds-on.ds-fault { background: var(--fault, #e23d3d); }"
+    },
+    {
+      "name": "Settings Card",
+      "kind": "card",
+      "refersTo": "button-default",
+      "description": "Collapsible settings section with raised head and bordered body.",
+      "html": "<article class=\"ds-card\"><div class=\"ds-card-head\"><span class=\"ds-card-title\">Connection</span></div><div class=\"ds-card-body-pad\"><p class=\"ds-hint\">Changes apply on reconnect.</p></div></article>",
+      "css": ".ds-card { background: var(--surface, #141414); border: 1px solid var(--border, #2a2a2a); border-radius: 2px; overflow: hidden; } .ds-card-head { display: flex; align-items: center; min-height: 48px; padding: 10px 14px; background: var(--surface-2, #1a1a1a); } .ds-card-title { font-size: 13px; font-weight: 600; color: var(--text, #f5f5f5); font-family: 'Bricolage Grotesque', 'Segoe UI', sans-serif; } .ds-card-body-pad { padding: 14px 16px 16px; border-top: 1px solid var(--border, #2a2a2a); } .ds-hint { color: var(--muted, #8a8a8a); font-size: 13px; margin: 0 0 12px; max-width: 65ch; line-height: 1.45; font-family: 'Bricolage Grotesque', 'Segoe UI', sans-serif; }"
+    },
+    {
+      "name": "Unread Badge",
+      "kind": "chip",
+      "refersTo": "button-cta",
+      "description": "Fault-red unread count chip on room chat and peer rows.",
+      "html": "<span class=\"ds-badge\">3</span>",
+      "css": ".ds-badge { display: inline-block; min-width: 16px; padding: 0 5px; background: var(--fault, #e23d3d); color: #ffffff; font-size: 10px; line-height: 16px; text-align: center; border-radius: 2px; font-family: 'Bricolage Grotesque', 'Segoe UI', sans-serif; font-weight: 500; }"
+    },
+    {
+      "name": "Network Sidebar Row",
+      "kind": "nav",
+      "refersTo": "bezel",
+      "description": "Quiet rail network item with square active tick and mono meta.",
+      "html": "<div class=\"ds-network-item ds-active\"><span class=\"ds-tick ds-on\"></span><div class=\"ds-network-info\"><div class=\"ds-network-name\">game-night</div><div class=\"ds-network-meta\">3 peers</div></div></div>",
+      "css": ".ds-network-item { display: flex; align-items: center; padding: 10px 12px; min-height: 44px; gap: 10px; border-bottom: 1px solid var(--border, #2a2a2a); cursor: pointer; transition: background 150ms cubic-bezier(0.16, 1, 0.3, 1); } .ds-network-item:hover { background: var(--bg-hover, #222222); } .ds-network-item.ds-active { background: var(--surface-2, #1a1a1a); } .ds-tick { width: 6px; height: 6px; flex-shrink: 0; background: var(--text-dim, #5c5c5c); } .ds-tick.ds-on { background: var(--text, #f5f5f5); } .ds-network-name { font-size: 13px; font-weight: 500; color: var(--text, #f5f5f5); font-family: 'Bricolage Grotesque', 'Segoe UI', sans-serif; } .ds-network-meta { font-size: 11px; font-family: 'IBM Plex Mono', Consolas, monospace; color: var(--muted, #8a8a8a); line-height: 1.4; }"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Signal Bench",
+    "overview": "The connected shell treats a mesh session like an oscilloscope readout: room identity, virtual IP, and path quality are the primary instruments; peers are numbered channels on a graticule; chat is a secondary readout panel. Layout is a horizontal bench — readout band on top, quiet network rail left, channel graticule center, chat readout right — not a three-pane messenger reskin.\n\nMatte black-and-white panels, 1px hairlines, and tracked uppercase labels over mono values carry the instrument metaphor. Path quality (Direct/p2p vs relay/WebSocket) is the chromatic trigger: green only for live direct paths, red only for relay, fault, unread, and error states. No ambient wash, grain, or decorative color elsewhere.\n\nThe intro/connect screen (space.css, ConnectView) is a separate visual world and out of scope for this system.",
+    "keyCharacteristics": [
+      "Readout-band chrome: room, VIP, path LEDs + segment bar, peer counts, theme toggle, bezel actions",
+      "Two-chroma signal grammar: --live green and --fault red only; everything else neutral B&W",
+      "Tracked .label-track captions over .cell-value mono readouts",
+      "Graticule peer table (.scope-face) with 48×28px grid lines",
+      "2px corner radius, hairline borders, tonal layering — no default drop shadows on surfaces",
+      "Dark default + light theme via data-theme=\"light\" token swap"
+    ],
+    "rules": [
+      {
+        "name": "The Two-Chroma Rule",
+        "body": "--live and --fault are the only hue accents in the connected shell. Do not introduce blues, yellows, or brand tints on connected surfaces. Neutral gray carries everything else, including caution and offline states.",
+        "section": "colors"
+      },
+      {
+        "name": "The Path-First Rule",
+        "body": "Color draws the eye to path quality before chat, settings, or decorative chrome. Green means direct; red means relay, degraded, unread, or error.",
+        "section": "colors"
+      },
+      {
+        "name": "The Label-Over-Value Rule",
+        "body": "Instrument captions sit above values: tracked uppercase label, then heavier mono or semibold value. Do not inline label:value pairs in the readout band.",
+        "section": "typography"
+      },
+      {
+        "name": "The Hairline Rule",
+        "body": "Structure uses 1px solid var(--border). Hover promotes to var(--hairline). No thick frames, inset glows, or offset drop shadows on bench surfaces.",
+        "section": "elevation"
+      }
+    ],
+    "dos": [
+      "Do scope all connected tokens and rules under html[data-app=\"connected\"] and connected.css.",
+      "Do lead with path quality in topbar and peer list before chat or settings affordances.",
+      "Do pair .label-track captions with mono or semibold values in readout surfaces.",
+      "Do use --live for p2p/direct and --fault for relay, ws, unread, errors only.",
+      "Do keep the graticule grid confined to .scope-face peer channels.",
+      "Do use 2px radius and 1px hairlines consistently across buttons, cards, inputs, and bezels."
+    ],
+    "donts": [
+      "Don't apply connected-shell tokens to the intro/connect screen (space.css world).",
+      "Don't add chromatic accents beyond --live and --fault on connected surfaces.",
+      "Don't use drop shadows, grain, or ambient washes on bench panels — overlays only.",
+      "Don't reskin as a messenger three-pane layout; chat is a secondary readout, not the home surface.",
+      "Don't use Bungee or connect-screen display fonts inside the connected shell."
+    ]
+  }
+}
