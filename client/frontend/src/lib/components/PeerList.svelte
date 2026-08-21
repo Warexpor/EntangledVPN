@@ -6,7 +6,6 @@
 
   $: sortedPeers = [...$peers].sort((a, b) => (a.nickname || '').localeCompare(b.nickname || ''))
   $: roomUnread = $unread['room:' + ($status.room || 'network')] || 0
-  $: anyRelay = $peers.some(p => p.path === 'relay' || p.path === 'ws')
 
   function openPeerChat(peer) {
     chatTarget.set({ id: peer.id, nickname: peer.nickname || peer.id })
@@ -56,6 +55,12 @@
     return $t.path_unknown
   }
 
+  function pathTone(path) {
+    if (path === 'p2p') return 'direct'
+    if (path === 'relay' || path === 'ws') return 'relay'
+    return ''
+  }
+
   function pathTip(path) {
     if (path === 'p2p') return $t.path_p2p_tip
     if (path === 'relay') return $t.path_relay_tip
@@ -73,18 +78,12 @@
 
 <div class="peer-view">
   <div class="peer-header">
-    <h2>{$status.room || $t.network}</h2>
-    <button class="ip-badge" on:click={() => copyIP($status.virtualIP)} title={$t.virtual_ip}>
-      {$status.virtualIP || $t.na}
-    </button>
+    <h2>{$t.header_peers}</h2>
     {#if $status.room}
       <button class="room-chat-btn" on:click={openRoomChat} title={$t.room_chat}>
-        [ {$t.chat} ]
-        {#if roomUnread > 0}<span class="badge">{roomUnread}</span>{/if}
+        {$t.chat}
+        {#if roomUnread > 0}<span class="badge unread-badge">{roomUnread}</span>{/if}
       </button>
-    {/if}
-    {#if anyRelay}
-      <span class="relay-hint">{$t.status_relay_degraded}</span>
     {/if}
   </div>
 
@@ -127,7 +126,7 @@
         </span>
         <span class="col-name" role="cell">
           <span class="nickname">{peer.nickname || peer.id}</span>
-          {#if peerUnread(peer.id) > 0}<span class="badge">{peerUnread(peer.id)}</span>{/if}
+          {#if peerUnread(peer.id) > 0}<span class="badge unread-badge">{peerUnread(peer.id)}</span>{/if}
         </span>
         <span
           class="col-ip clickable"
@@ -149,7 +148,14 @@
           class="col-path"
           role="cell"
           title={pathTip(peer.path)}
-        >{peer.path ? pathLabel(peer.path) : $t.path_unknown}</span>
+        >
+          {#if peer.path}
+            <span class="path-dot {pathTone(peer.path)}" aria-hidden="true"></span>
+            {pathLabel(peer.path)}
+          {:else}
+            {$t.path_unknown}
+          {/if}
+        </span>
         <span class="col-action" role="cell">
           <button
             class="row-btn"
@@ -157,18 +163,27 @@
             disabled={!peer.connected || !!pinging[peer.id]}
             title={$t.ping_peer}
             aria-label={$t.ping_peer}
-          >[~]</button>
+          >
+            <svg width="14" height="14" viewBox="0 0 16 16" aria-hidden="true">
+              <circle cx="8" cy="8" r="1.6" fill="currentColor" />
+              <circle cx="8" cy="8" r="4.2" fill="none" stroke="currentColor" stroke-width="1.2" />
+              <circle cx="8" cy="8" r="6.4" fill="none" stroke="currentColor" stroke-width="1.1" opacity="0.55" />
+            </svg>
+          </button>
           <button
             class="row-btn"
             on:click={() => openPeerChat(peer)}
             title="{$t.chat} {peer.nickname || peer.id}"
             aria-label="{$t.chat} {peer.nickname || peer.id}"
-          >[&gt;]</button>
+          >
+            <svg width="14" height="14" viewBox="0 0 16 16" aria-hidden="true">
+              <path d="M3 4.5h10v6.5H7.2L4 13.5V11H3z" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round" />
+            </svg>
+          </button>
         </span>
       </div>
     {:else}
       <div class="empty-peers">
-        <div class="empty-icon">[ . . . ]</div>
         <div class="empty-label">{$t.no_peers}</div>
         <div class="empty-desc">{$t.no_peers_desc}</div>
       </div>
@@ -192,29 +207,19 @@
     flex-wrap: wrap;
   }
   .peer-header h2 {
-    font-size: var(--font-size);
-    font-weight: 500;
-    color: var(--text-bright);
+    font-size: 10px;
+    font-weight: 600;
+    color: var(--text-dim);
     text-transform: uppercase;
-    letter-spacing: 0.5px;
+    letter-spacing: 0.08em;
   }
-  .ip-badge {
-    padding: 4px 8px;
-    min-height: 28px;
-    background: var(--bg-raised);
-    font-size: var(--font-size-xs);
-    font-family: var(--font-mono);
-    color: var(--text-secondary);
-    border: 1px solid var(--border);
-    cursor: pointer;
-  }
-  .ip-badge:hover { border-color: var(--border-hover); color: var(--text-bright); }
   .room-chat-btn {
     margin-left: auto;
     background: transparent;
     border: 1px solid var(--border);
+    border-radius: var(--radius-md, 6px);
     color: var(--text-secondary);
-    font-family: var(--font-mono);
+    font-family: inherit;
     font-size: var(--font-size-xs);
     padding: 6px 10px;
     min-height: 32px;
@@ -222,17 +227,13 @@
     position: relative;
   }
   .room-chat-btn:hover { color: var(--text-bright); border-color: var(--border-hover); }
-  .relay-hint {
-    font-size: var(--font-size-xs);
-    color: var(--text-muted);
-  }
   .badge {
     display: inline-block;
     min-width: 14px;
     padding: 0 4px;
     margin-left: 4px;
-    background: var(--accent);
-    color: var(--accent-ink);
+    background: var(--fault, var(--error));
+    color: #fff;
     font-size: 10px;
     line-height: 14px;
     text-align: center;
@@ -245,7 +246,7 @@
   }
   .table-row {
     display: grid;
-    grid-template-columns: minmax(56px, 72px) minmax(72px, 1fr) minmax(88px, 110px) minmax(48px, 70px) minmax(52px, 72px) minmax(64px, 80px);
+    grid-template-columns: minmax(56px, 72px) minmax(72px, 1fr) minmax(88px, 110px) minmax(48px, 70px) minmax(72px, 96px) minmax(64px, 80px);
     gap: 8px;
     align-items: center;
     padding: 10px 16px;
@@ -253,12 +254,16 @@
     border-bottom: 1px solid var(--border-deep);
     font-size: var(--font-size-sm);
     min-width: 520px;
+    transition: background var(--dur-fast, 120ms) ease;
+  }
+  .table-row:not(.table-header-row):hover {
+    background: var(--bg-hover);
   }
   .table-header-row {
     color: var(--text-muted);
     text-transform: uppercase;
     font-size: var(--font-size-xs);
-    letter-spacing: 0.4px;
+    letter-spacing: 0.08em;
   }
   .self-row { background: var(--bg-surface); }
   .nickname { color: var(--text-bright); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -270,6 +275,11 @@
   .col-ip, .col-ping, .col-path {
     font-family: var(--font-mono);
     color: var(--text-secondary);
+  }
+  .col-path {
+    display: flex;
+    align-items: center;
+    gap: 6px;
   }
   .col-ping.probing { color: var(--text-bright); }
   .clickable { cursor: pointer; }
@@ -286,10 +296,11 @@
   .sq {
     width: 8px;
     height: 8px;
+    border-radius: 50%;
     display: inline-block;
     flex-shrink: 0;
   }
-  .sq-online { background: var(--success); }
+  .sq-online { background: var(--text-bright); }
   .sq-offline { background: var(--text-dim); }
   .col-action {
     display: flex;
@@ -299,12 +310,15 @@
   .row-btn {
     background: transparent;
     border: none;
+    border-radius: var(--radius-sm, 4px);
     color: var(--text-muted);
     cursor: pointer;
-    font-family: var(--font-mono);
     min-width: 32px;
     min-height: 32px;
     padding: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
   }
   .row-btn:hover:not(:disabled) { color: var(--text-bright); }
   .row-btn:disabled {

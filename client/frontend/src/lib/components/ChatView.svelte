@@ -128,14 +128,17 @@
 
 <div class="chat-view">
   <div class="chat-header">
-    <button class="back-btn" on:click={closeChat} title={$t.back}>&lt;</button>
+    <button class="back-btn" on:click={closeChat} title={$t.back} aria-label={$t.back}>
+      <svg width="14" height="14" viewBox="0 0 16 16" aria-hidden="true">
+        <path d="M10.5 3.5 L5.5 8 L10.5 12.5" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
+      </svg>
+    </button>
     <span class="chat-title">{title}</span>
   </div>
 
   <div class="chat-messages" bind:this={chatContainer} on:scroll={onScroll}>
     {#if $chatMessages.length === 0}
       <div class="empty-chat">
-        <div class="empty-chat-icon">[ . . . ]</div>
         <div class="empty-chat-label">{$t.no_messages}</div>
         <div class="empty-chat-desc">{$t.no_messages_desc}</div>
       </div>
@@ -197,9 +200,9 @@
     justify-content: center;
     background: transparent;
     border: 1px solid var(--border);
+    border-radius: var(--radius-sm, 4px);
     color: var(--text-secondary);
     cursor: pointer;
-    font-family: var(--font-mono);
   }
   .chat-title {
     color: var(--text-bright);
@@ -245,6 +248,7 @@
     padding: 8px 10px;
     background: var(--bg-raised);
     border: 1px solid var(--border);
+    border-radius: var(--radius-sm, 4px);
     color: var(--text-primary);
     white-space: pre-wrap;
     word-break: break-word;
@@ -273,9 +277,10 @@
     resize: none;
     background: var(--bg-raised);
     border: 1px solid var(--border);
+    border-radius: var(--radius-sm, 4px);
     color: var(--text-primary);
     padding: 8px 10px;
-    font-family: var(--font-mono);
+    font-family: inherit;
     font-size: var(--font-size);
     min-height: 36px;
   }
@@ -284,9 +289,10 @@
     background: var(--accent);
     color: var(--accent-ink);
     border: none;
+    border-radius: var(--radius-md, 6px);
     padding: 0 16px;
     cursor: pointer;
-    font-family: var(--font-mono);
+    font-family: inherit;
     text-transform: uppercase;
   }
   .send-btn:disabled { opacity: 0.4; cursor: not-allowed; }

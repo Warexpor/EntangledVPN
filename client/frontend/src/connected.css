@@ -1,0 +1,194 @@
+/* Connected Operate shell. Intro keeps :root / Bungee / space.css. */
+
+html[data-app="connected"] {
+  --bg-deep: #0a0a0a;
+  --bg-primary: #0a0a0a;
+  --bg-surface: #111111;
+  --bg-raised: #181818;
+  --bg-hover: #1c1c1c;
+  --bg-active: #222222;
+  --border-deep: #1a1a1a;
+  --border: #2a2a2a;
+  --border-light: #3a3a3a;
+  --border-hover: #4a4a4a;
+  --text-bright: #f0f0f0;
+  --text-primary: #f0f0f0;
+  --text-secondary: #8a8a8a;
+  --text-muted: #8a8a8a;
+  --text-dim: #5c5c5c;
+  --accent: #ffffff;
+  --accent-hover: #f0f0f0;
+  --accent-ink: #0a0a0a;
+  --live: #2fbf62;
+  --fault: #e23d3d;
+  --success: #8a8a8a;
+  --warning: #8a8a8a;
+  --error: #e23d3d;
+  --focus-ring: #f0f0f0;
+  --font-sans: ui-sans-serif, 'Segoe UI', system-ui, sans-serif;
+  --font-mono: ui-monospace, 'Cascadia Code', Consolas, monospace;
+  --font-size: 13px;
+  --font-size-sm: 12px;
+  --font-size-xs: 10px;
+  --line-height: 1.45;
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --statusbar-height: 26px;
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --dur-fast: 120ms;
+  --dur-mid: 180ms;
+}
+
+html[data-app="connected"].light-theme {
+  --bg-deep: #f5f5f5;
+  --bg-primary: #f5f5f5;
+  --bg-surface: #ececec;
+  --bg-raised: #e4e4e4;
+  --bg-hover: #dedede;
+  --bg-active: #d6d6d6;
+  --border-deep: #e0e0e0;
+  --border: #d0d0d0;
+  --border-light: #c4c4c4;
+  --border-hover: #999999;
+  --text-bright: #111111;
+  --text-primary: #111111;
+  --text-secondary: #5c5c5c;
+  --text-muted: #6a6a6a;
+  --text-dim: #8a8a8a;
+  --accent: #111111;
+  --accent-hover: #000000;
+  --accent-ink: #f5f5f5;
+  --live: #1a8f45;
+  --fault: #c41e1e;
+  --success: #6a6a6a;
+  --warning: #6a6a6a;
+  --error: #c41e1e;
+  --focus-ring: #111111;
+}
+
+html[data-app="connected"],
+html[data-app="connected"] body,
+html[data-app="connected"] #app {
+  color: var(--text-primary);
+  font-family: var(--font-sans);
+  font-size: var(--font-size);
+  line-height: var(--line-height);
+  background: var(--bg-deep);
+}
+
+html[data-app="connected"] input,
+html[data-app="connected"] textarea,
+html[data-app="connected"] button,
+html[data-app="connected"] select {
+  font-family: inherit;
+}
+
+html[data-app="connected"] .btn {
+  padding: 6px 12px;
+  min-height: 32px;
+  height: 32px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--text-primary);
+  cursor: pointer;
+  font-size: var(--font-size-sm);
+  text-align: center;
+  font-family: var(--font-sans);
+  transition:
+    background var(--dur-fast) ease,
+    border-color var(--dur-fast) ease,
+    opacity var(--dur-fast) ease,
+    transform var(--dur-fast) ease;
+}
+
+html[data-app="connected"] .btn:hover:not(:disabled) {
+  background: var(--bg-hover);
+  border-color: var(--border-hover);
+}
+
+html[data-app="connected"] .btn:active:not(:disabled) {
+  transform: translateY(1px);
+}
+
+html[data-app="connected"] .btn.primary,
+html[data-app="connected"] .btn-save {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--accent-ink);
+  font-weight: 500;
+}
+
+html[data-app="connected"] .btn.primary:hover,
+html[data-app="connected"] .btn-save:hover {
+  background: var(--accent-hover);
+}
+
+html[data-app="connected"] .btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+html[data-app="connected"] .btn.danger {
+  color: var(--fault);
+  border-color: var(--fault);
+}
+
+html[data-app="connected"] .path-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  display: inline-block;
+  flex-shrink: 0;
+  background: var(--text-dim);
+}
+
+html[data-app="connected"] .path-dot.direct {
+  background: var(--live);
+}
+
+html[data-app="connected"] .path-dot.relay,
+html[data-app="connected"] .path-dot.reconnecting {
+  background: var(--fault);
+}
+
+html[data-app="connected"] .path-dot.reconnecting {
+  animation: pathPulse 1.2s var(--ease-out) infinite;
+}
+
+html[data-app="connected"] .path-dot.disconnected {
+  background: var(--text-dim);
+}
+
+html[data-app="connected"] .unread-badge {
+  background: var(--fault);
+  color: #fff;
+}
+
+@keyframes pathPulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.35; }
+}
+
+html[data-app="connected"] .connected-shell {
+  animation: shellIn var(--dur-mid) var(--ease-out) both;
+}
+
+@keyframes shellIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html[data-app="connected"] {
+    --dur-fast: 0.01ms;
+    --dur-mid: 0.01ms;
+  }
+  html[data-app="connected"] *,
+  html[data-app="connected"] *::before,
+  html[data-app="connected"] *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

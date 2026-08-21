@@ -114,7 +114,7 @@
     <p class="reconnect-banner" role="status">{$t.notif_reconnect_required}</p>
   {/if}
   <div class="section">
-    <div class="section-title">─── {$t.section_connection} ───</div>
+    <div class="section-title">{$t.section_connection}</div>
 
     <div class="setting-row">
       <label class="setting-label" for="cfg-server">{$t.server_addr}</label>
@@ -146,7 +146,7 @@
   </div>
 
   <div class="section">
-    <div class="section-title">─── {$t.section_network} ───</div>
+    <div class="section-title">{$t.section_network}</div>
     <p class="hint">{$t.advanced_warn}</p>
 
     <div class="setting-row">
@@ -184,7 +184,7 @@
   </div>
 
   <div class="section">
-    <div class="section-title">─── {$t.section_system} ───</div>
+    <div class="section-title">{$t.section_system}</div>
 
     <label class="setting-row toggle-row">
       <span class="setting-label">{$t.start_windows}</span>
@@ -216,7 +216,7 @@
   </div>
 
   <div class="section">
-    <div class="section-title">─── {$t.section_appearance} ───</div>
+    <div class="section-title">{$t.section_appearance}</div>
 
     <div class="setting-row scale-row">
       <label class="setting-label" for="cfg-scale">{$t.ui_scale}</label>
@@ -279,11 +279,11 @@
     height: 0;
   }
   .settings-title {
-    font-size: var(--font-size);
-    color: var(--text-bright);
+    font-size: 10px;
+    font-weight: 600;
+    color: var(--text-dim);
     text-transform: uppercase;
-    letter-spacing: 1px;
-    font-weight: 500;
+    letter-spacing: 0.08em;
     margin-bottom: 20px;
   }
   .reconnect-banner {
@@ -296,9 +296,12 @@
   }
   .section { margin-bottom: 24px; }
   .section-title {
-    font-size: var(--font-size-xs);
-    color: var(--text-muted);
-    letter-spacing: 1px;
+    font-size: 10px;
+    font-weight: 600;
+    color: var(--text-dim);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    margin-bottom: 10px;
   }
   .hint {
     font-size: var(--font-size-xs);
@@ -327,9 +330,10 @@
     flex: 1;
     background: var(--bg-raised);
     border: 1px solid var(--border);
+    border-radius: var(--radius-sm, 4px);
     color: var(--text-primary);
     padding: 8px 10px;
-    min-height: 36px;
+    min-height: 32px;
     font-family: var(--font-mono);
     font-size: var(--font-size-sm);
   }
@@ -359,9 +363,9 @@
     font-family: var(--font-mono);
   }
   .actions-section { display: flex; gap: 8px; align-items: center; }
-  .actions-section .btn { min-height: 36px; padding: 8px 14px; }
+  .actions-section .btn { min-height: 32px; padding: 6px 12px; }
   .update-row { flex-wrap: wrap; }
-  .update-row .btn { min-height: 36px; padding: 8px 14px; }
+  .update-row .btn { min-height: 32px; padding: 6px 12px; }
   .btn-check, .btn-update {
     background: var(--bg-raised);
     border: 1px solid var(--border);
