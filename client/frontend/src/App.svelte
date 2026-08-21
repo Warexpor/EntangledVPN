@@ -2,12 +2,14 @@
   import { onMount, onDestroy } from 'svelte'
   import { status, peers, view, settings, notifications, durableError, clearDurableError, addNotification, addChatMessage, addSystemChat } from './lib/stores/app.js'
   import { currentLang, setLang, t, fmt } from './lib/locales/index.js'
+  import { derivePathAggregate } from './lib/path.js'
   import Sidebar from './lib/components/Sidebar.svelte'
   import PeerList from './lib/components/PeerList.svelte'
   import StatusBar from './lib/components/StatusBar.svelte'
   import ConnectView from './lib/components/ConnectView.svelte'
   import ChatView from './lib/components/ChatView.svelte'
   import SettingsView from './lib/components/SettingsView.svelte'
+  import ConnectedHeader from './lib/components/ConnectedHeader.svelte'
 
   function clampScale(n) {
     const v = Number(n) || 100
@@ -26,6 +28,13 @@
       document.documentElement.classList.remove('light-theme')
     }
   }
+
+  $: document.documentElement.setAttribute(
+    'data-app',
+    $view === 'connect' ? 'connect' : 'connected',
+  )
+
+  $: pathAggregate = derivePathAggregate($status, $peers)
 
   let sidebarWidth = 220
   let isDragging = false
@@ -127,8 +136,10 @@
   })
 </script>
 
-<div class="space-bg" aria-hidden="true"></div>
-<div class="space-dust" aria-hidden="true"></div>
+{#if $view === 'connect'}
+  <div class="space-bg" aria-hidden="true"></div>
+  <div class="space-dust" aria-hidden="true"></div>
+{/if}
 
 {#if $view === 'connect'}
   <div class="shell connect-shell">
@@ -137,7 +148,16 @@
     </div>
   </div>
 {:else}
-  <div class="shell">
+  <div class="shell connected-shell">
+    <!--
+      THESIS: Room, VIP, and path are the first facts. Peers are a dense channel list. Chat is available without becoming the product. Green is Direct only. Red is relay, reconnect, unread, and error.
+      OWN-WORLD: Opaque matte bench. No starfield. System sans for chrome, system mono for VIP, IP, ping, and path. Intro keeps Bungee and space.
+      STORY: You are in a named room with a virtual IP. Path quality is the instrument. Disconnect lives in the header, not only on the connect screen.
+      FIRST VIEWPORT: Header band with wordmark, room, copyable VIP, path dot and label, peer count, settings, disconnect. Left rail of saved networks. Main peer table. Slim footer for server and version.
+      FORM: Signal-bench v2 from DESIGN.md on the master baseline. User-pinned B&W. One pathAggregate. No LED, graticule, or CRT costume.
+      FINISH: Dense, sharp, readable. Confirm before disconnect.
+    -->
+    <ConnectedHeader {pathAggregate} />
     <div class="layout">
       <div class="sidebar-wrapper" style="width: {sidebarWidth}px">
         <Sidebar />
@@ -164,7 +184,7 @@
       </main>
     </div>
 
-    <StatusBar />
+    <StatusBar {pathAggregate} />
   </div>
 {/if}
 
@@ -196,6 +216,9 @@
   }
   .connect-shell {
     z-index: 1;
+  }
+  .connected-shell {
+    background: var(--bg-primary);
   }
   .layout {
     display: flex;

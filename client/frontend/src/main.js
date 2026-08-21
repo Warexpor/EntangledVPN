@@ -1,3 +1,4 @@
+import './lib/sim.js'
 import App from './App.svelte'
 import './app.css'
 

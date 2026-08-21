@@ -296,7 +296,11 @@
             aria-label={$t.more_actions}
             title={$t.more_actions}
             on:click={(e) => toggleMenu(e, room.name)}
-          >⋯</button>
+          ><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true">
+              <circle cx="8" cy="3.5" r="1.25" fill="currentColor" />
+              <circle cx="8" cy="8" r="1.25" fill="currentColor" />
+              <circle cx="8" cy="12.5" r="1.25" fill="currentColor" />
+            </svg></button>
           {#if menuOpen === room.name}
             <div class="overflow-menu" role="menu" tabindex="-1" on:click|stopPropagation on:keydown|stopPropagation>
               <button type="button" role="menuitem" class="menu-item" on:click={(e) => menuAction(e, () => copyInvite(room))}>
@@ -441,10 +445,10 @@
     border-bottom: 1px solid var(--border);
   }
   .sidebar-header h2 {
-    font-size: 11px;
+    font-size: 10px;
     text-transform: uppercase;
-    letter-spacing: 1px;
-    color: var(--text-secondary);
+    letter-spacing: 0.08em;
+    color: var(--text-dim);
     font-weight: 600;
   }
   .sidebar-meta {
@@ -460,8 +464,8 @@
     border-bottom: 1px solid var(--border);
   }
   .sidebar-actions .btn {
-    min-height: 36px;
-    padding: 8px 10px;
+    min-height: 32px;
+    padding: 6px 12px;
   }
   .network-list {
     flex: 1;
@@ -473,7 +477,7 @@
     display: flex;
     align-items: center;
     padding: 10px 12px;
-    min-height: 44px;
+    min-height: 40px;
     cursor: pointer;
     gap: 8px;
     border-bottom: 1px solid var(--border-deep);
@@ -490,13 +494,14 @@
     opacity: 0.55;
   }
   .network-indicator {
-    width: 4px;
-    height: 12px;
-    background: var(--text-muted);
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--text-dim);
     flex-shrink: 0;
   }
   .network-indicator.active-dot {
-    background: var(--accent);
+    background: var(--text-bright);
   }
   .network-info {
     flex: 1;
@@ -521,11 +526,9 @@
   .menu-btn {
     background: none;
     border: 1px solid transparent;
+    border-radius: var(--radius-sm, 4px);
     color: var(--text-muted);
     cursor: pointer;
-    font-family: var(--font-mono);
-    font-size: 16px;
-    line-height: 1;
     width: 32px;
     height: 32px;
     display: flex;
@@ -545,6 +548,7 @@
     min-width: 160px;
     background: var(--bg-raised);
     border: 1px solid var(--border);
+    border-radius: var(--radius-md, 6px);
     display: flex;
     flex-direction: column;
     box-shadow: 0 4px 12px rgba(0,0,0,0.35);
@@ -556,13 +560,13 @@
     padding: 10px 12px;
     min-height: 36px;
     color: var(--text-primary);
-    font-family: var(--font-mono);
+    font-family: inherit;
     font-size: var(--font-size-sm);
     cursor: pointer;
   }
   .menu-item:hover { background: var(--bg-hover); color: var(--text-bright); }
-  .menu-item.danger { color: var(--error); }
-  .menu-item.danger:hover { background: rgba(196, 92, 92, 0.12); }
+  .menu-item.danger { color: var(--fault, var(--error)); }
+  .menu-item.danger:hover { background: rgba(226, 61, 61, 0.1); }
   .empty-desc {
     margin-top: 6px;
     font-size: var(--font-size-xs);
@@ -580,7 +584,7 @@
   }
   .settings-btn {
     width: 100%;
-    min-height: 36px;
+    min-height: 32px;
   }
   .modal-overlay {
     position: fixed;
@@ -599,6 +603,7 @@
   .modal {
     background: var(--bg-surface);
     border: 1px solid var(--border);
+    border-radius: var(--radius-md, 6px);
     padding: 20px;
     width: 320px;
     max-height: 80vh;
@@ -610,14 +615,16 @@
   .modal h3 {
     font-size: var(--font-size);
     color: var(--text-bright);
-    font-weight: 500;
+    font-weight: 600;
     text-transform: uppercase;
-    letter-spacing: 0.5px;
+    letter-spacing: 0.08em;
+    font-size: 10px;
   }
   .modal input {
     padding: 10px 10px;
-    min-height: 40px;
+    min-height: 36px;
     border: 1px solid var(--border);
+    border-radius: var(--radius-sm, 4px);
     background: var(--bg-primary);
     color: var(--text-primary);
     font-size: var(--font-size);
@@ -640,7 +647,7 @@
     gap: 6px;
     justify-content: flex-end;
   }
-  .modal-actions .btn { min-height: 36px; padding: 8px 12px; }
+  .modal-actions .btn { min-height: 32px; padding: 6px 12px; }
   .sr-only {
     position: absolute;
     width: 1px;
