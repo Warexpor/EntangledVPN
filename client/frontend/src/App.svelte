@@ -170,17 +170,19 @@
       </div>
 
       <main class="main-area">
-        <div class="view-fade" key={$view}>
-          {#if $view === 'network'}
-            <PeerList />
-          {:else if $view === 'chat'}
-            <ChatView />
-          {:else if $view === 'settings'}
-            <SettingsView />
-          {:else}
-            <div class="unknown-view">Unknown view: {$view}</div>
-          {/if}
-        </div>
+        {#key $view}
+          <div class="view-pane">
+            {#if $view === 'network'}
+              <PeerList />
+            {:else if $view === 'chat'}
+              <ChatView />
+            {:else if $view === 'settings'}
+              <SettingsView />
+            {:else}
+              <div class="unknown-view">Unknown view: {$view}</div>
+            {/if}
+          </div>
+        {/key}
       </main>
     </div>
 
@@ -266,17 +268,23 @@
     min-width: 0;
     min-height: 0;
   }
-  .view-fade {
+  .view-pane {
     flex: 1;
     display: flex;
     flex-direction: column;
     min-height: 0;
     min-width: 0;
-    animation: viewIn 0.2s ease-out;
+    animation: viewIn 180ms var(--ease-out, ease-out) both;
   }
   @keyframes viewIn {
-    0% { opacity: 0; transform: translateY(8px); }
-    100% { opacity: 1; transform: translateY(0); }
+    from {
+      opacity: 0;
+      transform: translateY(4px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
   }
   .unknown-view {
     padding: 40px;
@@ -317,6 +325,10 @@
   .error-strip-dismiss:hover {
     background: rgba(196, 92, 92, 0.12);
   }
+  @keyframes slideIn {
+    from { transform: translateX(12px); opacity: 0; }
+    to { transform: translateX(0); opacity: 1; }
+  }
   .notification {
     position: fixed;
     top: 12px;
@@ -327,7 +339,7 @@
     background: var(--bg-raised);
     border: 1px solid var(--border);
     color: var(--text-primary);
-    animation: slideIn 0.15s ease-out;
+    animation: slideIn 160ms var(--ease-out, ease-out) both;
   }
   .notification.error {
     border-color: var(--error);
@@ -339,9 +351,5 @@
   .notif-icon {
     margin-right: 6px;
     font-weight: 700;
-  }
-  @keyframes slideIn {
-    from { transform: translateX(100%); opacity: 0; }
-    to { transform: translateX(0); opacity: 1; }
   }
 </style>

@@ -4,11 +4,22 @@
 
   export let pathAggregate = 'disconnected'
 
+  let prevView = 'network'
+
   $: pathLabel =
     pathAggregate === 'direct' ? $t.path_p2p
     : pathAggregate === 'relay' ? $t.path_relay
     : pathAggregate === 'reconnecting' ? $t.status_reconnecting
     : $t.status_disconnected
+
+  function toggleSettings() {
+    if ($view === 'settings') {
+      view.set(prevView || 'network')
+    } else {
+      prevView = $view
+      view.set('settings')
+    }
+  }
 
   async function copyVip() {
     const ip = $status.virtualIP
@@ -69,7 +80,12 @@
   </div>
 
   <div class="actions">
-    <button type="button" class="btn" on:click={() => view.set('settings')}>{$t.settings}</button>
+    <button
+      type="button"
+      class="btn"
+      class:active={$view === 'settings'}
+      on:click={toggleSettings}
+    >{$t.settings}</button>
     <button type="button" class="btn danger" on:click={disconnect}>{$t.disconnect}</button>
   </div>
 </header>
@@ -146,5 +162,10 @@
     gap: 8px;
     flex-shrink: 0;
     margin-left: auto;
+  }
+  .btn.active {
+    border-color: var(--border-hover);
+    background: var(--bg-hover);
+    color: var(--text-bright);
   }
 </style>

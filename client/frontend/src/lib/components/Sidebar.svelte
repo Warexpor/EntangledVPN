@@ -17,7 +17,6 @@
   let serverAddr = ''
   let nickname = ''
   let joining = ''
-  let prevView = 'network'
   let menuOpen = null
   let createDialog
   let joinDialog
@@ -331,19 +330,6 @@
     {/each}
   </div>
 
-  <div class="sidebar-footer">
-    <button class="btn settings-btn" on:click={() => {
-      if ($view === 'settings') {
-        $view = prevView
-      } else {
-        prevView = $view
-        $view = 'settings'
-      }
-    }}>
-      {$t.settings}
-    </button>
-  </div>
-
   {#if showCreate}
     <div
       class="modal-overlay"
@@ -577,14 +563,6 @@
     text-align: center;
     color: var(--text-muted);
     font-size: var(--font-size-sm);
-  }
-  .sidebar-footer {
-    padding: 8px;
-    border-top: 1px solid var(--border);
-  }
-  .settings-btn {
-    width: 100%;
-    min-height: 32px;
   }
   .modal-overlay {
     position: fixed;

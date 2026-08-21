@@ -254,6 +254,10 @@
     border-bottom: 1px solid var(--border-deep);
     font-size: var(--font-size-sm);
     min-width: 520px;
+    transition: background var(--dur-fast, 120ms) ease;
+  }
+  .table-row:not(.table-header-row):hover {
+    background: var(--bg-hover);
   }
   .table-header-row {
     color: var(--text-muted);

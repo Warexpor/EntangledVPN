@@ -34,6 +34,9 @@ html[data-app="connected"] {
   --radius-sm: 4px;
   --radius-md: 6px;
   --statusbar-height: 26px;
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --dur-fast: 120ms;
+  --dur-mid: 180ms;
 }
 
 html[data-app="connected"].light-theme {
@@ -92,12 +95,20 @@ html[data-app="connected"] .btn {
   font-size: var(--font-size-sm);
   text-align: center;
   font-family: var(--font-sans);
-  transition: background 0.12s ease, border-color 0.12s ease, opacity 0.12s ease;
+  transition:
+    background var(--dur-fast) ease,
+    border-color var(--dur-fast) ease,
+    opacity var(--dur-fast) ease,
+    transform var(--dur-fast) ease;
 }
 
 html[data-app="connected"] .btn:hover:not(:disabled) {
   background: var(--bg-hover);
   border-color: var(--border-hover);
+}
+
+html[data-app="connected"] .btn:active:not(:disabled) {
+  transform: translateY(1px);
 }
 
 html[data-app="connected"] .btn.primary,
@@ -137,9 +148,16 @@ html[data-app="connected"] .path-dot.direct {
 }
 
 html[data-app="connected"] .path-dot.relay,
-html[data-app="connected"] .path-dot.reconnecting,
-html[data-app="connected"] .path-dot.disconnected {
+html[data-app="connected"] .path-dot.reconnecting {
   background: var(--fault);
+}
+
+html[data-app="connected"] .path-dot.reconnecting {
+  animation: pathPulse 1.2s var(--ease-out) infinite;
+}
+
+html[data-app="connected"] .path-dot.disconnected {
+  background: var(--text-dim);
 }
 
 html[data-app="connected"] .unread-badge {
@@ -147,7 +165,25 @@ html[data-app="connected"] .unread-badge {
   color: #fff;
 }
 
+@keyframes pathPulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.35; }
+}
+
+html[data-app="connected"] .connected-shell {
+  animation: shellIn var(--dur-mid) var(--ease-out) both;
+}
+
+@keyframes shellIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
 @media (prefers-reduced-motion: reduce) {
+  html[data-app="connected"] {
+    --dur-fast: 0.01ms;
+    --dur-mid: 0.01ms;
+  }
   html[data-app="connected"] *,
   html[data-app="connected"] *::before,
   html[data-app="connected"] *::after {

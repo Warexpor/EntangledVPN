@@ -24,7 +24,7 @@ Wails v2 desktop. Connect screen first (frozen). After connect: networks, peers,
 
 ## Capabilities and Constraints
 
-- Connected: networks rail, peers home, chat, settings, disconnect, theme, copy VIP, ping, DMs.
+- Connected: networks rail, peers home, chat, settings (header only), disconnect, theme, copy VIP, ping, DMs.
 - Intro / ConnectView + space.css are out of scope and must keep current look.
 - Do not invent crypto claims, server hosts, or fake telemetry.
 - Preview: Vite DEV sim with `?connected=1` when `window.go` is absent.
