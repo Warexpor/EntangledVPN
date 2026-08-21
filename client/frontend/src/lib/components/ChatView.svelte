@@ -1,7 +1,7 @@
 <script>
   import { afterUpdate } from 'svelte'
   import {
-    chatMessages, chatTarget, status, view, settings,
+    chatMessages, chatTarget, status, chatOpen, settings,
     addNotification, addChatMessage, updateMessageStatus, markThreadRead, activeThreadKey
   } from '../stores/app.js'
   import { t, fmt } from '../locales/index.js'
@@ -12,7 +12,7 @@
   let isNearBottom = true
 
   $: {
-    if ($view === 'chat') {
+    if ($chatOpen) {
       markThreadRead(activeThreadKey())
     }
   }
@@ -116,8 +116,7 @@
   }
 
   function closeChat() {
-    chatTarget.set(null)
-    view.set('network')
+    chatOpen.set(false)
   }
 
   $: title = $chatTarget
@@ -127,17 +126,19 @@
 </script>
 
 <div class="chat-view">
-  <div class="chat-header">
-    <button class="back-btn" on:click={closeChat} title={$t.back}>&lt;</button>
-    <span class="chat-title">{title}</span>
+  <div class="section-head">
+    <div>
+      <span class="label-track">{$t.chat}</span>
+      <h2>{title}</h2>
+    </div>
+    <button type="button" class="bezel" on:click={closeChat}>{$t.close_chat}</button>
   </div>
 
   <div class="chat-messages" bind:this={chatContainer} on:scroll={onScroll}>
     {#if $chatMessages.length === 0}
-      <div class="empty-chat">
-        <div class="empty-chat-icon">[ . . . ]</div>
-        <div class="empty-chat-label">{$t.no_messages}</div>
-        <div class="empty-chat-desc">{$t.no_messages_desc}</div>
+      <div class="empty">
+        <div class="empty-label">{$t.no_messages}</div>
+        <p class="empty-desc">{$t.no_messages_desc}</p>
       </div>
     {/if}
     {#each $chatMessages as msg, i (msg.id)}
@@ -147,8 +148,9 @@
       {#if msg.system}
         <div class="system-line">{msg.message}</div>
       {:else}
-        <div class="msg" class:self={msg.isSelf}>
+        <div class="msg" class:self={msg.isSelf} class:failed={msg.status === 'failed'}>
           <div class="msg-meta">
+            <span class="msg-time">{new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false })}</span>
             <span class="msg-nick">{msg.isSelf ? ($settings.nickname || $t.you_self) : msg.nickname}</span>
             {#if msg.status === 'pending'}<span class="msg-status">…</span>{/if}
             {#if msg.status === 'failed'}
@@ -161,17 +163,18 @@
     {/each}
   </div>
 
-  <div class="chat-input-area">
+  <div class="composer">
     <textarea
       bind:this={textareaEl}
       bind:value={inputText}
       on:keydown={handleKeydown}
       on:input={onTextInput}
+      aria-label={$t.type_message}
       placeholder={canSend ? $t.type_message : $t.send_disabled_no_room}
       rows="1"
       disabled={!canSend}
     ></textarea>
-    <button class="send-btn" on:click={sendMessage} disabled={!canSend || !inputText.trim()}>{$t.send}</button>
+    <button class="btn btn-cta" on:click={sendMessage} disabled={!canSend || !inputText.trim()}>{$t.send}</button>
   </div>
 </div>
 
@@ -180,114 +183,112 @@
     display: flex;
     flex-direction: column;
     height: 100%;
+    flex: 1;
+    padding: 12px 14px 12px;
+    min-height: 0;
+    background: var(--surface);
   }
-  .chat-header {
+  .section-head {
     display: flex;
-    align-items: center;
-    gap: 10px;
-    padding: 12px 16px;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 8px;
+    padding-bottom: 10px;
     border-bottom: 1px solid var(--border);
-    background: var(--bg-surface);
+    flex-shrink: 0;
   }
-  .back-btn {
-    width: 28px;
-    height: 28px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    background: transparent;
-    border: 1px solid var(--border);
-    color: var(--text-secondary);
-    cursor: pointer;
-    font-family: var(--font-mono);
-  }
-  .chat-title {
-    color: var(--text-bright);
-    font-size: var(--font-size);
+  .section-head h2 {
+    font-size: 1.05rem;
+    font-weight: 600;
+    letter-spacing: -0.03em;
+    color: var(--text);
+    margin: 2px 0 0;
   }
   .chat-messages {
     flex: 1;
     overflow-y: auto;
-    padding: 16px;
     min-height: 0;
+    padding: 4px 0 12px;
+    font-family: var(--font-mono);
+    font-size: 12px;
   }
-  .empty-chat {
-    text-align: center;
-    padding: 40px 16px;
-    color: var(--text-muted);
+  .empty {
+    padding: 12px 2px;
+    color: var(--muted);
+    font-family: var(--font-sans);
   }
-  .empty-chat-label { color: var(--text-secondary); margin: 8px 0 4px; }
-  .empty-chat-desc { font-size: var(--font-size-xs); }
+  .empty-label { color: var(--text); margin-bottom: 4px; font-weight: 500; }
+  .empty-desc {
+    font-family: var(--font-serif);
+    font-style: italic;
+    font-size: 13px;
+    margin: 0;
+  }
   .date-sep {
-    text-align: center;
-    font-size: var(--font-size-xs);
-    color: var(--text-dim);
-    margin: 12px 0;
+    text-align: left;
+    font-size: 10px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin: 14px 0 8px;
+    font-family: var(--font-sans);
   }
   .system-line {
-    text-align: center;
-    font-size: var(--font-size-xs);
-    color: var(--text-muted);
-    margin: 8px 0;
+    font-size: 12px;
+    color: var(--muted);
+    margin: 6px 0;
   }
   .msg {
-    margin-bottom: 10px;
-    max-width: 80%;
+    margin-bottom: 8px;
   }
-  .msg.self { margin-left: auto; text-align: right; }
   .msg-meta {
-    font-size: var(--font-size-xs);
-    color: var(--text-muted);
+    font-size: 11px;
+    color: var(--muted);
     margin-bottom: 2px;
-  }
-  .msg-body {
-    display: inline-block;
-    padding: 8px 10px;
-    background: var(--bg-raised);
-    border: 1px solid var(--border);
-    color: var(--text-primary);
-    white-space: pre-wrap;
-    word-break: break-word;
-    text-align: left;
-  }
-  .msg.self .msg-body {
-    background: var(--bg-active);
-  }
-  .retry-btn {
-    margin-left: 6px;
-    background: transparent;
-    border: none;
-    color: var(--error);
-    cursor: pointer;
-    font-size: var(--font-size-xs);
-  }
-  .chat-input-area {
     display: flex;
     gap: 8px;
-    padding: 12px 16px;
+    align-items: baseline;
+  }
+  .msg.self .msg-nick { color: var(--text); }
+  .msg-time { color: var(--text-dim); }
+  .msg-nick { color: var(--text); font-weight: 500; }
+  .msg-body {
+    color: var(--text);
+    white-space: pre-wrap;
+    word-break: break-word;
+    line-height: 1.45;
+  }
+  .msg.failed .msg-body { color: var(--fault); }
+  .retry-btn {
+    margin-left: auto;
+    background: transparent;
+    border: none;
+    color: var(--fault);
+    cursor: pointer;
+    font-size: 11px;
+    font-family: inherit;
+  }
+  .composer {
+    display: flex;
+    gap: 8px;
+    padding: 10px 0 0;
     border-top: 1px solid var(--border);
-    background: var(--bg-surface);
+    flex-shrink: 0;
+    align-items: flex-end;
   }
   textarea {
     flex: 1;
     resize: none;
-    background: var(--bg-raised);
+    background: var(--bg);
     border: 1px solid var(--border);
-    color: var(--text-primary);
+    border-radius: var(--radius);
+    color: var(--text);
     padding: 8px 10px;
-    font-family: var(--font-mono);
-    font-size: var(--font-size);
-    min-height: 36px;
+    font-family: var(--font-sans);
+    font-size: 14px;
+    min-height: 40px;
+    line-height: 1.4;
   }
   textarea:disabled { opacity: 0.5; }
-  .send-btn {
-    background: var(--accent);
-    color: var(--accent-ink);
-    border: none;
-    padding: 0 16px;
-    cursor: pointer;
-    font-family: var(--font-mono);
-    text-transform: uppercase;
-  }
-  .send-btn:disabled { opacity: 0.4; cursor: not-allowed; }
 </style>

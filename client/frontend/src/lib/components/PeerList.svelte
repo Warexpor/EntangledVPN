@@ -1,23 +1,24 @@
 <script>
-  import { status, peers, view, chatTarget, settings, unread, markThreadRead, addNotification } from '../stores/app.js'
+  import { status, peers, chatOpen, chatTarget, settings, unread, markThreadRead, addNotification } from '../stores/app.js'
   import { t, fmt } from '../locales/index.js'
+
+  export let pathAggregate = 'disconnected'
 
   let pinging = {}
 
   $: sortedPeers = [...$peers].sort((a, b) => (a.nickname || '').localeCompare(b.nickname || ''))
   $: roomUnread = $unread['room:' + ($status.room || 'network')] || 0
-  $: anyRelay = $peers.some(p => p.path === 'relay' || p.path === 'ws')
 
   function openPeerChat(peer) {
     chatTarget.set({ id: peer.id, nickname: peer.nickname || peer.id })
     markThreadRead('peer:' + peer.id)
-    view.set('chat')
+    chatOpen.set(true)
   }
 
   function openRoomChat() {
     chatTarget.set(null)
     markThreadRead('room:' + ($status.room || 'network'))
-    view.set('chat')
+    chatOpen.set(true)
   }
 
   async function copyIP(ip) {
@@ -69,110 +70,122 @@
       copyIP(ip)
     }
   }
+
+  function pathKind(path) {
+    if (path === 'p2p') return 'live'
+    if (path === 'relay' || path === 'ws') return 'fault'
+    return 'idle'
+  }
+
+  function peerDot(peer) {
+    if (!peer.connected) return 'idle'
+    return pathKind(peer.path)
+  }
+
+  function chIndex(i) {
+    return String(i).padStart(2, '0')
+  }
 </script>
 
 <div class="peer-view">
-  <div class="peer-header">
-    <h2>{$status.room || $t.network}</h2>
-    <button class="ip-badge" on:click={() => copyIP($status.virtualIP)} title={$t.virtual_ip}>
-      {$status.virtualIP || $t.na}
-    </button>
+  <div class="section-head">
+    <div>
+      <span class="label-track">{$t.channels}</span>
+      <h2>{$status.room || $t.peers_list}</h2>
+    </div>
     {#if $status.room}
-      <button class="room-chat-btn" on:click={openRoomChat} title={$t.room_chat}>
-        [ {$t.chat} ]
+      <button type="button" class="bezel" on:click={openRoomChat}>
+        {$t.room_chat}
         {#if roomUnread > 0}<span class="badge">{roomUnread}</span>{/if}
       </button>
     {/if}
-    {#if anyRelay}
-      <span class="relay-hint">{$t.status_relay_degraded}</span>
-    {/if}
   </div>
+  {#if pathAggregate === 'relay'}
+    <p class="section-hint fault">{$t.status_relay_degraded}</p>
+  {/if}
 
-  <div class="peer-table" role="table" aria-label={$t.networks}>
-    <div class="table-row table-header-row" role="row">
-      <span class="sq-note" role="columnheader" aria-label={$t.col_status}></span>
-      <span class="col-name" role="columnheader">{$t.col_nickname}</span>
-      <span class="col-ip" role="columnheader">{$t.col_ip}</span>
-      <span class="col-ping" role="columnheader">{$t.col_ping}</span>
-      <span class="col-path" role="columnheader">{$t.col_path}</span>
-      <span class="col-action" role="columnheader"></span>
+  <div class="scope-face">
+    <div class="channel-head" aria-hidden="true">
+      <span>{$t.col_ch}</span>
+      <span>{$t.col_nickname}</span>
+      <span>{$t.col_ip}</span>
+      <span>{$t.col_path}</span>
+      <span>{$t.col_ping}</span>
+      <span></span>
     </div>
+    <div class="stack" role="list" aria-label={$t.peers_list}>
+      <article class="peer-row self-row" role="listitem">
+        <span class="ch">{chIndex(0)}</span>
+        <div class="nickname">
+          {$settings.nickname || $t.you}
+          <span class="self-tag">{$t.me}</span>
+        </div>
+        <button
+          type="button"
+          class="peer-ip"
+          on:click={() => copyIP($status.virtualIP)}
+          on:keydown={(e) => onIpKey(e, $status.virtualIP)}
+        >{$status.virtualIP || $t.na}</button>
+        <span class="col-path idle">{$t.path_unknown}</span>
+        <span class="col-ping">—</span>
+        <span class="peer-actions"></span>
+      </article>
 
-    <div class="table-row self-row" role="row">
-      <span class="status-cell" role="cell">
-        <span class="sq sq-online" aria-hidden="true"></span>
-        <span class="status-text">{$t.status_online}</span>
-      </span>
-      <span class="col-name" role="cell">
-        <span class="nickname">{$settings.nickname || $t.you}</span>
-        <span class="self-tag">{$t.me}</span>
-      </span>
-      <span
-        class="col-ip clickable"
-        role="button"
-        tabindex="0"
-        on:click={() => copyIP($status.virtualIP)}
-        on:keydown={(e) => onIpKey(e, $status.virtualIP)}
-      >{$status.virtualIP || $t.na}</span>
-      <span class="col-ping" role="cell">-</span>
-      <span class="col-path" role="cell">-</span>
-      <span class="col-action" role="cell"></span>
+      {#each sortedPeers as peer, i (peer.id)}
+        {@const kind = peerDot(peer)}
+        <article class="peer-row" role="listitem">
+          <span class="ch">{chIndex(i + 1)}</span>
+          <div class="nickname">
+            {peer.nickname || peer.id}
+            {#if peerUnread(peer.id) > 0}<span class="badge">{peerUnread(peer.id)}</span>{/if}
+          </div>
+          <button
+            type="button"
+            class="peer-ip"
+            on:click={() => copyIP(peer.virtualIP)}
+            on:keydown={(e) => onIpKey(e, peer.virtualIP)}
+          >{peer.virtualIP || $t.na}</button>
+          <span
+            class="col-path"
+            class:live={kind === 'live'}
+            class:fault={kind === 'fault'}
+            class:idle={kind === 'idle'}
+            title={pathTip(peer.path)}
+          >
+            <svg class="trace" viewBox="0 0 40 10" aria-hidden="true">
+              <line x1="3" y1="5" x2="37" y2="5" />
+              <circle cx="5" cy="5" r="2" />
+              <circle cx="35" cy="5" r="2" />
+            </svg>
+            {peer.connected && peer.path ? pathLabel(peer.path) : $t.path_unknown}
+          </span>
+          <span class="col-ping" class:probing={peer.connected && (peer.ping < 0 || pinging[peer.id])}>
+            {#if !peer.connected}
+              —
+            {:else if peer.ping >= 0 && !pinging[peer.id]}
+              {peer.ping}ms
+            {:else}
+              …
+            {/if}
+          </span>
+          <div class="peer-actions">
+            <button
+              class="btn btn-ghost btn-sm"
+              on:click={() => pingPeer(peer)}
+              disabled={!peer.connected || !!pinging[peer.id]}
+            >{$t.ping_peer}</button>
+            <button class="btn btn-ghost btn-sm" on:click={() => openPeerChat(peer)}>
+              {$t.chat}
+            </button>
+          </div>
+        </article>
+      {:else}
+        <div class="empty">
+          <div class="empty-label">{$t.no_peers}</div>
+          <p class="empty-desc">{$t.no_peers_desc}</p>
+        </div>
+      {/each}
     </div>
-
-    {#each sortedPeers as peer (peer.id)}
-      <div class="table-row" role="row">
-        <span class="status-cell" role="cell">
-          <span class="sq {peer.connected ? 'sq-online' : 'sq-offline'}" aria-hidden="true"></span>
-          <span class="status-text">{peer.connected ? $t.status_online : $t.status_offline}</span>
-        </span>
-        <span class="col-name" role="cell">
-          <span class="nickname">{peer.nickname || peer.id}</span>
-          {#if peerUnread(peer.id) > 0}<span class="badge">{peerUnread(peer.id)}</span>{/if}
-        </span>
-        <span
-          class="col-ip clickable"
-          role="button"
-          tabindex="0"
-          on:click={() => copyIP(peer.virtualIP)}
-          on:keydown={(e) => onIpKey(e, peer.virtualIP)}
-        >{peer.virtualIP || $t.na}</span>
-        <span class="col-ping" role="cell" class:probing={peer.connected && (peer.ping < 0 || pinging[peer.id])}>
-          {#if !peer.connected}
-            -
-          {:else if peer.ping >= 0 && !pinging[peer.id]}
-            {peer.ping}ms
-          {:else}
-            ...
-          {/if}
-        </span>
-        <span
-          class="col-path"
-          role="cell"
-          title={pathTip(peer.path)}
-        >{peer.path ? pathLabel(peer.path) : $t.path_unknown}</span>
-        <span class="col-action" role="cell">
-          <button
-            class="row-btn"
-            on:click={() => pingPeer(peer)}
-            disabled={!peer.connected || !!pinging[peer.id]}
-            title={$t.ping_peer}
-            aria-label={$t.ping_peer}
-          >[~]</button>
-          <button
-            class="row-btn"
-            on:click={() => openPeerChat(peer)}
-            title="{$t.chat} {peer.nickname || peer.id}"
-            aria-label="{$t.chat} {peer.nickname || peer.id}"
-          >[&gt;]</button>
-        </span>
-      </div>
-    {:else}
-      <div class="empty-peers">
-        <div class="empty-icon">[ . . . ]</div>
-        <div class="empty-label">{$t.no_peers}</div>
-        <div class="empty-desc">{$t.no_peers_desc}</div>
-      </div>
-    {/each}
   </div>
 </div>
 
@@ -181,144 +194,176 @@
     display: flex;
     flex-direction: column;
     height: 100%;
+    padding: 12px 16px 20px;
+    overflow: auto;
+    min-height: 0;
   }
-  .peer-header {
-    padding: 12px 16px;
-    border-bottom: 1px solid var(--border);
+  .section-head {
     display: flex;
-    align-items: center;
-    gap: 10px;
-    background: var(--bg-surface);
-    flex-wrap: wrap;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 10px;
   }
-  .peer-header h2 {
-    font-size: var(--font-size);
-    font-weight: 500;
-    color: var(--text-bright);
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
+  .section-head h2 {
+    font-size: 1.05rem;
+    font-weight: 600;
+    letter-spacing: -0.03em;
+    color: var(--text);
+    margin: 2px 0 0;
   }
-  .ip-badge {
-    padding: 4px 8px;
-    min-height: 28px;
-    background: var(--bg-raised);
-    font-size: var(--font-size-xs);
-    font-family: var(--font-mono);
-    color: var(--text-secondary);
-    border: 1px solid var(--border);
-    cursor: pointer;
+  .section-hint {
+    color: var(--muted);
+    font-size: 13px;
+    margin: 0 0 10px;
   }
-  .ip-badge:hover { border-color: var(--border-hover); color: var(--text-bright); }
-  .room-chat-btn {
-    margin-left: auto;
-    background: transparent;
-    border: 1px solid var(--border);
-    color: var(--text-secondary);
-    font-family: var(--font-mono);
-    font-size: var(--font-size-xs);
-    padding: 6px 10px;
-    min-height: 32px;
-    cursor: pointer;
+  .section-hint.fault { color: var(--fault); }
+  .scope-face {
     position: relative;
+    flex: 1;
+    min-height: 0;
+    border: 1px solid var(--border);
+    background-color: var(--bg);
+    background-image:
+      repeating-linear-gradient(
+        to right,
+        var(--graticule) 0 1px,
+        transparent 1px 48px
+      ),
+      repeating-linear-gradient(
+        to bottom,
+        var(--graticule) 0 1px,
+        transparent 1px 28px
+      );
   }
-  .room-chat-btn:hover { color: var(--text-bright); border-color: var(--border-hover); }
-  .relay-hint {
-    font-size: var(--font-size-xs);
-    color: var(--text-muted);
+  .channel-head,
+  .peer-row {
+    display: grid;
+    grid-template-columns: 36px minmax(0, 1.3fr) 118px 128px 56px auto;
+    gap: 10px;
+    align-items: center;
+    padding: 0 12px;
+  }
+  .channel-head {
+    min-height: 28px;
+    border-bottom: 1px solid var(--border);
+    background: color-mix(in srgb, var(--surface) 82%, transparent);
+    font-size: 10px;
+    font-weight: 500;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+  .stack {
+    display: flex;
+    flex-direction: column;
+  }
+  .peer-row {
+    min-height: 44px;
+    border-bottom: 1px solid var(--border);
+    background: color-mix(in srgb, var(--bg) 55%, transparent);
+  }
+  .self-row { opacity: 0.88; }
+  .ch {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--muted);
+  }
+  .nickname {
+    color: var(--text);
+    font-weight: 500;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .self-tag {
+    margin-left: 6px;
+    font-size: 11px;
+    color: var(--muted);
+    font-weight: 400;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+  }
+  .peer-ip {
+    font-family: var(--font-mono);
+    font-size: 12px;
+    color: var(--muted);
+    background: none;
+    border: 0;
+    padding: 0;
+    cursor: pointer;
+    text-align: left;
+  }
+  .peer-ip:hover { color: var(--text); }
+  .col-ping {
+    font-family: var(--font-mono);
+    font-size: 12px;
+    color: var(--muted);
+  }
+  .col-ping.probing { color: var(--text); }
+  .col-path {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+    font-weight: 500;
+    font-family: var(--font-mono);
+    color: var(--muted);
+    min-width: 0;
+  }
+  .col-path.live { color: var(--live); }
+  .col-path.fault { color: var(--fault); }
+  .col-path.idle { color: var(--muted); }
+  .trace {
+    width: 36px;
+    height: 10px;
+    flex-shrink: 0;
+  }
+  .trace line,
+  .trace circle {
+    fill: currentColor;
+    stroke: currentColor;
+    stroke-width: 1;
+  }
+  .peer-actions {
+    display: flex;
+    gap: 6px;
+    justify-content: flex-end;
   }
   .badge {
     display: inline-block;
-    min-width: 14px;
-    padding: 0 4px;
-    margin-left: 4px;
-    background: var(--accent);
-    color: var(--accent-ink);
-    font-size: 10px;
-    line-height: 14px;
-    text-align: center;
-  }
-  .peer-table {
-    flex: 1;
-    overflow: auto;
-    min-height: 0;
-    min-width: 0;
-  }
-  .table-row {
-    display: grid;
-    grid-template-columns: minmax(56px, 72px) minmax(72px, 1fr) minmax(88px, 110px) minmax(48px, 70px) minmax(52px, 72px) minmax(64px, 80px);
-    gap: 8px;
-    align-items: center;
-    padding: 10px 16px;
-    min-height: 40px;
-    border-bottom: 1px solid var(--border-deep);
-    font-size: var(--font-size-sm);
-    min-width: 520px;
-  }
-  .table-header-row {
-    color: var(--text-muted);
-    text-transform: uppercase;
-    font-size: var(--font-size-xs);
-    letter-spacing: 0.4px;
-  }
-  .self-row { background: var(--bg-surface); }
-  .nickname { color: var(--text-bright); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .self-tag {
+    min-width: 16px;
+    padding: 0 5px;
     margin-left: 6px;
-    font-size: var(--font-size-xs);
-    color: var(--text-muted);
-  }
-  .col-ip, .col-ping, .col-path {
-    font-family: var(--font-mono);
-    color: var(--text-secondary);
-  }
-  .col-ping.probing { color: var(--text-bright); }
-  .clickable { cursor: pointer; }
-  .clickable:hover { color: var(--text-bright); }
-  .status-cell {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-  }
-  .status-text {
-    font-size: var(--font-size-xs);
-    color: var(--text-secondary);
-  }
-  .sq {
-    width: 8px;
-    height: 8px;
-    display: inline-block;
-    flex-shrink: 0;
-  }
-  .sq-online { background: var(--success); }
-  .sq-offline { background: var(--text-dim); }
-  .col-action {
-    display: flex;
-    gap: 2px;
-    justify-content: flex-end;
-  }
-  .row-btn {
-    background: transparent;
-    border: none;
-    color: var(--text-muted);
-    cursor: pointer;
-    font-family: var(--font-mono);
-    min-width: 32px;
-    min-height: 32px;
-    padding: 0;
-  }
-  .row-btn:hover:not(:disabled) { color: var(--text-bright); }
-  .row-btn:disabled {
-    opacity: 0.35;
-    cursor: not-allowed;
-  }
-  .empty-peers {
-    padding: 48px 24px;
+    background: var(--fault);
+    color: #fff;
+    font-size: 10px;
+    line-height: 16px;
     text-align: center;
-    color: var(--text-muted);
+    border-radius: var(--radius);
   }
-  .empty-label {
-    color: var(--text-secondary);
-    margin: 8px 0 4px;
+  .empty {
+    padding: 20px 12px;
+    color: var(--muted);
+    background: color-mix(in srgb, var(--bg) 70%, transparent);
   }
-  .empty-desc { font-size: var(--font-size-xs); }
+  .empty-label { color: var(--text); margin-bottom: 4px; font-weight: 500; }
+  .empty-desc {
+    font-family: var(--font-serif);
+    font-style: italic;
+    font-size: 13px;
+    margin: 0;
+  }
+  .btn-sm {
+    min-height: 28px;
+    padding: 4px 10px;
+    font-size: 12px;
+  }
+  @media (max-width: 720px) {
+    .channel-head, .peer-row { grid-template-columns: 28px minmax(0, 1fr) auto; }
+    .channel-head span:nth-child(3),
+    .channel-head span:nth-child(4),
+    .channel-head span:nth-child(5),
+    .peer-ip, .col-path, .col-ping { display: none; }
+  }
 </style>

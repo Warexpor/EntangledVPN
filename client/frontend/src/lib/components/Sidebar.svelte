@@ -1,7 +1,8 @@
 <script>
   import { onMount, onDestroy } from 'svelte'
-  import { status, view, addNotification, peers, clearDurableError } from '../stores/app.js'
+  import { status, view, addNotification, clearDurableError } from '../stores/app.js'
   import { t, fmt } from '../locales/index.js'
+  import ConfirmDialog from './ConfirmDialog.svelte'
 
   let savedRooms = []
   let showCreate = false
@@ -17,10 +18,10 @@
   let serverAddr = ''
   let nickname = ''
   let joining = ''
-  let prevView = 'network'
   let menuOpen = null
   let createDialog
   let joinDialog
+  let pending = null
 
   onMount(async () => {
     savedRooms = await window.go.main.App.GetSavedRooms()
@@ -128,42 +129,55 @@
   }
 
   async function leaveRoom() {
-    if (!confirm($t.confirm_leave)) return
-    try {
-      await window.go.main.App.LeaveRoom()
-      addNotification($t.notif_left)
-      await loadSavedRooms()
-    } catch (e) {
-      addNotification(fmt($t.error_leave, { err: e }), 'error')
+    pending = {
+      message: $t.confirm_leave,
+      confirmLabel: $t.leave,
+      run: async () => {
+        try {
+          await window.go.main.App.LeaveRoom()
+          addNotification($t.notif_left)
+          await loadSavedRooms()
+        } catch (e) {
+          addNotification(fmt($t.error_leave, { err: e }), 'error')
+        }
+      },
     }
   }
 
   async function removeSaved(name) {
     const active = $status.room === name
-    if (active) {
-      if (!confirm($t.confirm_leave_remove)) return
-    } else if (!confirm(fmt($t.confirm_remove, { name }))) {
-      return
-    }
-    try {
-      if (active) await window.go.main.App.LeaveRoom()
-      await window.go.main.App.RemoveSavedRoom(name)
-      addNotification(fmt($t.notif_removed, { name }))
-      await loadSavedRooms()
-    } catch (e) {
-      addNotification(fmt($t.error_remove, { err: e }), 'error')
+    pending = {
+      message: active ? $t.confirm_leave_remove : fmt($t.confirm_remove, { name }),
+      confirmLabel: $t.remove,
+      danger: true,
+      run: async () => {
+        try {
+          if (active) await window.go.main.App.LeaveRoom()
+          await window.go.main.App.RemoveSavedRoom(name)
+          addNotification(fmt($t.notif_removed, { name }))
+          await loadSavedRooms()
+        } catch (e) {
+          addNotification(fmt($t.error_remove, { err: e }), 'error')
+        }
+      },
     }
   }
 
   async function deleteNetwork(name) {
-    if (!confirm(fmt($t.confirm_delete, { name }))) return
-    try {
-      await window.go.main.App.DeleteRoom(name)
-      await window.go.main.App.RemoveSavedRoom(name)
-      addNotification(fmt($t.notif_deleted, { name }))
-      await loadSavedRooms()
-    } catch (e) {
-      addNotification(String(e), 'error')
+    pending = {
+      message: fmt($t.confirm_delete, { name }),
+      confirmLabel: $t.delete_room,
+      danger: true,
+      run: async () => {
+        try {
+          await window.go.main.App.DeleteRoom(name)
+          await window.go.main.App.RemoveSavedRoom(name)
+          addNotification(fmt($t.notif_deleted, { name }))
+          await loadSavedRooms()
+        } catch (e) {
+          addNotification(String(e), 'error')
+        }
+      },
     }
   }
 
@@ -244,17 +258,17 @@
 
 <aside class="sidebar" aria-label={$t.networks}>
   <div class="sidebar-header">
-    <h2>{$t.networks}</h2>
+    <span class="label-track">{$t.networks}</span>
     <div class="sidebar-meta">
       {fmt($t.network_count, { n: savedRooms.length })}
     </div>
   </div>
 
   <div class="sidebar-actions">
-    <button class="btn" on:click={openCreate} disabled={!$status.connected}>
+    <button type="button" class="bezel" on:click={openCreate} disabled={!$status.connected}>
       {$t.create_network}
     </button>
-    <button class="btn" on:click={openJoin} disabled={!$status.connected}>
+    <button type="button" class="bezel" on:click={openJoin} disabled={!$status.connected}>
       {$t.join_network}
     </button>
   </div>
@@ -272,7 +286,7 @@
         on:click={() => switchRoom(room.name, room.password, room.server)}
         on:keydown={(e) => onRowKey(e, room)}
       >
-        <div class="network-indicator" class:active-dot={$status.room === room.name} aria-hidden="true"></div>
+        <span class="tick" class:on={$status.room === room.name} aria-hidden="true"></span>
         <div class="network-info">
           <div class="network-name">{room.name}</div>
           <div class="network-meta">
@@ -325,19 +339,6 @@
         <div class="empty-desc">{$t.no_networks_desc}</div>
       </div>
     {/each}
-  </div>
-
-  <div class="sidebar-footer">
-    <button class="btn settings-btn" on:click={() => {
-      if ($view === 'settings') {
-        $view = prevView
-      } else {
-        prevView = $view
-        $view = 'settings'
-      }
-    }}>
-      {$t.settings}
-    </button>
   </div>
 
   {#if showCreate}
@@ -427,47 +428,56 @@
   {/if}
 </aside>
 
+<ConfirmDialog
+  open={!!pending}
+  message={pending?.message || ''}
+  confirmLabel={pending?.confirmLabel || $t.create}
+  danger={!!pending?.danger}
+  onConfirm={async () => {
+    const run = pending?.run
+    pending = null
+    if (run) await run()
+  }}
+  onCancel={() => (pending = null)}
+/>
+
 <style>
   .sidebar {
     width: 100%;
     height: 100%;
-    background: var(--bg-surface);
+    background: transparent;
     display: flex;
     flex-direction: column;
     flex-shrink: 0;
   }
   .sidebar-header {
-    padding: 12px;
-    border-bottom: 1px solid var(--border);
-  }
-  .sidebar-header h2 {
-    font-size: 11px;
-    text-transform: uppercase;
-    letter-spacing: 1px;
-    color: var(--text-secondary);
-    font-weight: 600;
+    padding: 14px 14px 8px;
   }
   .sidebar-meta {
-    font-size: var(--font-size-xs);
-    color: var(--text-muted);
+    font-size: 11px;
+    font-family: var(--font-mono);
+    color: var(--muted);
     margin-top: 4px;
   }
   .sidebar-actions {
-    padding: 8px;
+    padding: 8px 12px 12px;
     display: flex;
     flex-direction: column;
     gap: 6px;
-    border-bottom: 1px solid var(--border);
   }
-  .sidebar-actions .btn {
-    min-height: 36px;
-    padding: 8px 10px;
+  .sidebar-actions .bezel {
+    width: 100%;
+  }
+  .sidebar-actions .bezel:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
   }
   .network-list {
     flex: 1;
     overflow-y: auto;
     overflow-x: hidden;
-    padding: 4px 0;
+    padding: 0 0 12px;
+    border-top: 1px solid var(--border);
   }
   .network-item {
     display: flex;
@@ -475,43 +485,43 @@
     padding: 10px 12px;
     min-height: 44px;
     cursor: pointer;
-    gap: 8px;
-    border-bottom: 1px solid var(--border-deep);
-    transition: background 0.12s ease, opacity 0.12s ease;
+    gap: 10px;
+    border-bottom: 1px solid var(--border);
+    transition: background var(--dur-fast, 150ms) var(--ease-out, ease);
     position: relative;
   }
   .network-item:hover, .network-item:focus-visible {
     background: var(--bg-hover);
   }
   .network-item.active {
-    background: var(--bg-active);
+    background: var(--surface-2);
   }
   .network-item.disabled {
     opacity: 0.55;
   }
-  .network-indicator {
-    width: 4px;
-    height: 12px;
-    background: var(--text-muted);
+  .tick {
+    width: 6px;
+    height: 6px;
     flex-shrink: 0;
+    background: var(--text-dim);
   }
-  .network-indicator.active-dot {
-    background: var(--accent);
-  }
+  .tick.on { background: var(--text); }
   .network-info {
     flex: 1;
     min-width: 0;
   }
   .network-name {
-    font-size: var(--font-size);
-    color: var(--text-bright);
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text);
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
   }
   .network-meta {
-    font-size: var(--font-size-xs);
-    color: var(--text-secondary);
+    font-size: 11px;
+    font-family: var(--font-mono);
+    color: var(--muted);
     line-height: 1.4;
   }
   .row-actions {
@@ -521,33 +531,34 @@
   .menu-btn {
     background: none;
     border: 1px solid transparent;
-    color: var(--text-muted);
+    color: var(--muted);
     cursor: pointer;
-    font-family: var(--font-mono);
     font-size: 16px;
     line-height: 1;
     width: 32px;
     height: 32px;
+    border-radius: var(--radius);
     display: flex;
     align-items: center;
     justify-content: center;
   }
   .menu-btn:hover, .menu-btn[aria-expanded="true"] {
-    color: var(--text-bright);
+    color: var(--text);
     border-color: var(--border);
-    background: var(--bg-raised);
+    background: var(--surface);
   }
   .overflow-menu {
     position: absolute;
     right: 0;
     top: 100%;
     z-index: 20;
-    min-width: 160px;
-    background: var(--bg-raised);
+    min-width: 168px;
+    background: var(--surface);
     border: 1px solid var(--border);
+    border-radius: var(--radius);
     display: flex;
     flex-direction: column;
-    box-shadow: 0 4px 12px rgba(0,0,0,0.35);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.28);
   }
   .menu-item {
     background: none;
@@ -555,92 +566,71 @@
     text-align: left;
     padding: 10px 12px;
     min-height: 36px;
-    color: var(--text-primary);
-    font-family: var(--font-mono);
-    font-size: var(--font-size-sm);
+    color: var(--text);
+    font-size: 13px;
     cursor: pointer;
   }
-  .menu-item:hover { background: var(--bg-hover); color: var(--text-bright); }
+  .menu-item:hover { background: var(--bg-hover); }
   .menu-item.danger { color: var(--error); }
-  .menu-item.danger:hover { background: rgba(196, 92, 92, 0.12); }
+  .menu-item.danger:hover { background: color-mix(in srgb, var(--error) 12%, transparent); }
   .empty-desc {
     margin-top: 6px;
-    font-size: var(--font-size-xs);
+    font-size: 12px;
     color: var(--text-dim);
   }
   .empty-state {
-    padding: 16px;
-    text-align: center;
-    color: var(--text-muted);
-    font-size: var(--font-size-sm);
-  }
-  .sidebar-footer {
-    padding: 8px;
-    border-top: 1px solid var(--border);
-  }
-  .settings-btn {
-    width: 100%;
-    min-height: 36px;
+    padding: 16px 12px;
+    text-align: left;
+    color: var(--muted);
+    font-size: 13px;
   }
   .modal-overlay {
     position: fixed;
     inset: 0;
-    background: rgba(0,0,0,0.7);
+    background: color-mix(in srgb, var(--bg) 55%, transparent);
     display: flex;
     align-items: center;
     justify-content: center;
     z-index: 100;
-    animation: fadeIn 0.12s ease-out;
-  }
-  @keyframes fadeIn {
-    from { opacity: 0; }
-    to { opacity: 1; }
   }
   .modal {
-    background: var(--bg-surface);
+    background: var(--surface);
     border: 1px solid var(--border);
+    border-radius: var(--radius);
     padding: 20px;
-    width: 320px;
+    width: 340px;
     max-height: 80vh;
     overflow-y: auto;
     display: flex;
     flex-direction: column;
     gap: 10px;
+    box-shadow: 0 12px 40px rgba(0,0,0,0.28);
   }
   .modal h3 {
-    font-size: var(--font-size);
-    color: var(--text-bright);
-    font-weight: 500;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-  }
-  .modal input {
-    padding: 10px 10px;
-    min-height: 40px;
-    border: 1px solid var(--border);
-    background: var(--bg-primary);
-    color: var(--text-primary);
-    font-size: var(--font-size);
-    font-family: var(--font-mono);
+    font-size: 1.05rem;
+    color: var(--text);
+    font-weight: 600;
+    letter-spacing: -0.02em;
   }
   .modal input.invalid {
     border-color: var(--error);
   }
   .field-error, .modal-error {
-    font-size: var(--font-size-xs);
+    font-size: 12px;
     color: var(--error);
   }
   .modal-error {
     padding: 8px;
     border: 1px solid var(--error);
-    background: rgba(196, 92, 92, 0.08);
+    border-radius: var(--radius);
+    background: color-mix(in srgb, var(--error) 10%, transparent);
   }
   .modal-actions {
     display: flex;
-    gap: 6px;
+    gap: 8px;
     justify-content: flex-end;
+    margin-top: 6px;
   }
-  .modal-actions .btn { min-height: 36px; padding: 8px 12px; }
   .sr-only {
     position: absolute;
     width: 1px;

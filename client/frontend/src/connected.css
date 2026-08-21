@@ -1,0 +1,461 @@
+@font-face {
+  font-family: 'Bricolage Grotesque';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('./assets/fonts/bricolage-latin-400.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Bricolage Grotesque';
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url('./assets/fonts/bricolage-latin-500.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Bricolage Grotesque';
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url('./assets/fonts/bricolage-latin-600.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'IBM Plex Mono';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('./assets/fonts/ibm-plex-mono-latin-400.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'IBM Plex Mono';
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url('./assets/fonts/ibm-plex-mono-latin-500.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'IBM Plex Serif';
+  font-style: italic;
+  font-weight: 400;
+  font-display: swap;
+  src: url('./assets/fonts/ibm-plex-serif-latin-400-italic.woff2') format('woff2');
+}
+
+html[data-app="connected"] {
+  color-scheme: dark;
+  --bg: #0a0a0a;
+  --surface: #141414;
+  --surface-2: #1a1a1a;
+  --border: #2a2a2a;
+  --hairline: #3a3a3a;
+  --muted: #8a8a8a;
+  --text: #f5f5f5;
+  --cta: #ffffff;
+  --cta-fill: #ffffff;
+  --cta-ink: #0a0a0a;
+  --caution: #a3a3a3;
+  --danger: #f5f5f5;
+  --live: #2fbf62;
+  --fault: #e23d3d;
+  --radius: 2px;
+  --graticule: #262626;
+  --font-sans: 'Bricolage Grotesque', 'Segoe UI', sans-serif;
+  --font-serif: 'IBM Plex Serif', Georgia, serif;
+  --font-mono: 'IBM Plex Mono', Consolas, monospace;
+  --switch-track: #1a1a1a;
+  --switch-thumb: #f5f5f5;
+  --switch-icon-on: #0a0a0a;
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-inout: cubic-bezier(0.4, 0, 0.2, 1);
+  --dur-fast: 150ms;
+  --dur-mid: 280ms;
+  --dur-slow: 420ms;
+  --bg-deep: var(--bg);
+  --bg-primary: var(--bg);
+  --bg-surface: var(--surface);
+  --bg-raised: var(--surface-2);
+  --bg-hover: #222;
+  --bg-active: #262626;
+  --border-deep: var(--border);
+  --border-light: var(--hairline);
+  --border-hover: var(--hairline);
+  --text-bright: var(--text);
+  --text-primary: var(--text);
+  --text-secondary: var(--muted);
+  --text-muted: var(--muted);
+  --text-dim: #5c5c5c;
+  --accent: var(--cta-fill);
+  --accent-hover: #e8e8e8;
+  --accent-ink: var(--cta-ink);
+  --success: var(--live);
+  --warning: var(--caution);
+  --error: var(--fault);
+  --focus-ring: var(--cta);
+  --font-size: 14px;
+  --font-size-sm: 13px;
+  --font-size-xs: 12px;
+  --line-height: 1.5;
+}
+
+html[data-app="connected"][data-theme="light"] {
+  color-scheme: light;
+  --bg: #ffffff;
+  --surface: #f7f7f7;
+  --surface-2: #eeeeee;
+  --border: #d4d4d4;
+  --hairline: #b8b8b8;
+  --muted: #5c5c5c;
+  --text: #111111;
+  --cta: #111111;
+  --cta-fill: #111111;
+  --cta-ink: #ffffff;
+  --caution: #5c5c5c;
+  --danger: #111111;
+  --live: #1a8f45;
+  --fault: #c41e1e;
+  --switch-track: #e6e6e6;
+  --switch-thumb: #111111;
+  --switch-icon-on: #ffffff;
+  --bg-hover: #ececec;
+  --bg-active: #e4e4e4;
+  --text-dim: #9a9a9a;
+  --accent-hover: #2a2a2a;
+  --error: var(--fault);
+  --graticule: #d8d8d8;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html[data-app="connected"] {
+    --dur-fast: 0.01ms;
+    --dur-mid: 0.01ms;
+    --dur-slow: 0.01ms;
+  }
+}
+
+html[data-app="connected"],
+html[data-app="connected"] body,
+html[data-app="connected"] #app {
+  font-family: var(--font-sans);
+  font-size: var(--font-size);
+  color: var(--text);
+  background: var(--bg);
+}
+
+html[data-app="connected"] input,
+html[data-app="connected"] textarea,
+html[data-app="connected"] button,
+html[data-app="connected"] select {
+  font-family: inherit;
+  font-size: inherit;
+}
+
+html[data-app="connected"] ::selection {
+  background: color-mix(in srgb, var(--text) 18%, transparent);
+  color: var(--text);
+}
+
+html[data-app="connected"] :focus-visible {
+  outline: 2px solid var(--text);
+  outline-offset: 2px;
+}
+
+html[data-app="connected"] .dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  background: var(--text-dim);
+}
+html[data-app="connected"] .dot-live { background: var(--live); }
+html[data-app="connected"] .dot-fault { background: var(--fault); }
+html[data-app="connected"] .dot-idle { background: var(--text-dim); }
+
+html[data-app="connected"] .btn {
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--text);
+  padding: 8px 14px;
+  min-height: 36px;
+  border-radius: var(--radius);
+  cursor: pointer;
+  font-weight: 500;
+  font-size: 13px;
+  letter-spacing: 0;
+  text-transform: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-sans);
+  transition:
+    background var(--dur-mid) var(--ease-out),
+    border-color var(--dur-mid) var(--ease-out),
+    color var(--dur-mid) var(--ease-out),
+    opacity var(--dur-mid) var(--ease-out);
+}
+html[data-app="connected"] .btn:hover:not(:disabled) {
+  border-color: var(--hairline);
+  background: var(--surface-2);
+}
+html[data-app="connected"] .btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+html[data-app="connected"] .btn-ghost {
+  border-color: var(--border);
+  color: var(--muted);
+}
+html[data-app="connected"] .btn-ghost:hover:not(:disabled) {
+  color: var(--text);
+}
+html[data-app="connected"] .btn-quiet {
+  border-color: transparent;
+  color: var(--muted);
+}
+html[data-app="connected"] .btn-quiet:hover:not(:disabled) {
+  border-color: var(--border);
+  color: var(--text);
+  background: transparent;
+}
+html[data-app="connected"] .btn-cta,
+html[data-app="connected"] .btn.primary,
+html[data-app="connected"] .btn-save {
+  background: var(--cta-fill);
+  color: var(--cta-ink);
+  border-color: var(--cta-fill);
+  font-weight: 600;
+}
+html[data-app="connected"] .btn-cta:hover:not(:disabled),
+html[data-app="connected"] .btn.primary:hover:not(:disabled),
+html[data-app="connected"] .btn-save:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--cta-fill) 88%, var(--cta-ink));
+}
+html[data-app="connected"] .btn.danger {
+  color: var(--fault);
+  border-color: color-mix(in srgb, var(--fault) 45%, var(--border));
+}
+
+html[data-app="connected"] .card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+html[data-app="connected"] .card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 48px;
+  padding: 10px 14px;
+  background: var(--surface-2);
+}
+html[data-app="connected"] .card-disclosure {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: transparent;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  text-align: left;
+  color: inherit;
+  font: inherit;
+  min-height: 28px;
+}
+html[data-app="connected"] .card-title {
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--text);
+}
+html[data-app="connected"] .card-body {
+  display: grid;
+  grid-template-rows: 1fr;
+  border-top: 1px solid var(--border);
+  transition:
+    grid-template-rows var(--dur-slow) var(--ease-out),
+    border-color var(--dur-mid) var(--ease-out);
+}
+html[data-app="connected"] .card-body.collapsed {
+  grid-template-rows: 0fr;
+  border-top-color: transparent;
+}
+html[data-app="connected"] .card-body-inner {
+  overflow: hidden;
+  min-height: 0;
+}
+html[data-app="connected"] .card-body-pad {
+  padding: 14px 16px 16px;
+}
+html[data-app="connected"] .collapse-chevron {
+  color: var(--muted);
+  width: 28px;
+  height: 28px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+  transition: transform var(--dur-mid) var(--ease-out);
+  flex-shrink: 0;
+}
+html[data-app="connected"] .collapse-chevron.collapsed {
+  transform: rotate(-90deg);
+}
+
+html[data-app="connected"] .field {
+  margin-bottom: 12px;
+}
+html[data-app="connected"] .field label,
+html[data-app="connected"] .setting-label {
+  display: block;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--muted);
+  margin-bottom: 4px;
+}
+html[data-app="connected"] .field input,
+html[data-app="connected"] .field select,
+html[data-app="connected"] .field textarea,
+html[data-app="connected"] .settings-view input[type="text"],
+html[data-app="connected"] .settings-view input[type="password"],
+html[data-app="connected"] .settings-view input[type="number"],
+html[data-app="connected"] .settings-view select,
+html[data-app="connected"] .modal input {
+  width: 100%;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  color: var(--text);
+  padding: 8px 10px;
+  min-height: 36px;
+  font-size: 13px;
+  font-family: var(--font-mono);
+}
+html[data-app="connected"] .hint {
+  color: var(--muted);
+  font-size: 13px;
+  margin: 0 0 12px;
+  max-width: 65ch;
+  line-height: 1.45;
+}
+
+html[data-app="connected"] .theme-switch {
+  --ts-thumb: 28px;
+  --ts-inset: 3px;
+  --ts-travel: 36px;
+  position: relative;
+  width: calc(var(--ts-thumb) + var(--ts-inset) * 2 + var(--ts-travel));
+  height: calc(var(--ts-thumb) + var(--ts-inset) * 2);
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: transparent;
+  cursor: pointer;
+  flex-shrink: 0;
+  box-sizing: border-box;
+  min-width: 62px;
+  min-height: 34px;
+}
+html[data-app="connected"] .theme-switch:hover { border-color: var(--hairline); }
+html[data-app="connected"] .theme-switch-track {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  overflow: hidden;
+}
+html[data-app="connected"] .theme-switch-thumb {
+  position: absolute;
+  top: 50%;
+  left: var(--ts-inset);
+  width: var(--ts-thumb);
+  height: var(--ts-thumb);
+  border-radius: 50%;
+  background: var(--switch-thumb);
+  border: 1px solid var(--border);
+  transform: translate3d(0, -50%, 0);
+  z-index: 2;
+  pointer-events: none;
+}
+html[data-app="connected"] .theme-switch.is-dark .theme-switch-thumb {
+  transform: translate3d(var(--ts-travel), -50%, 0);
+}
+html[data-app="connected"] .theme-switch-icon {
+  position: absolute;
+  top: 50%;
+  width: var(--ts-thumb);
+  height: var(--ts-thumb);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--muted);
+  opacity: 0.4;
+  transform: translateY(-50%) scale(0.92);
+  z-index: 3;
+  pointer-events: none;
+}
+html[data-app="connected"] .theme-switch-icon svg {
+  display: block;
+  width: 16px;
+  height: 16px;
+}
+html[data-app="connected"] .theme-switch-sun {
+  left: var(--ts-inset);
+}
+html[data-app="connected"] .theme-switch-moon {
+  left: calc(var(--ts-inset) + var(--ts-travel));
+}
+html[data-app="connected"] .theme-switch:not(.is-dark) .theme-switch-sun,
+html[data-app="connected"] .theme-switch.is-dark .theme-switch-moon {
+  color: var(--switch-icon-on);
+  opacity: 1;
+  transform: translateY(-50%) scale(1);
+}
+
+html[data-app="connected"] .label-track {
+  display: block;
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--muted);
+  line-height: 1.2;
+}
+html[data-app="connected"] .led {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  background: var(--text-dim);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--text) 18%, transparent);
+}
+html[data-app="connected"] .led.on.live { background: var(--live); }
+html[data-app="connected"] .led.on.fault { background: var(--fault); }
+html[data-app="connected"] .led.on.idle { background: var(--text); }
+html[data-app="connected"] .bezel {
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--text);
+  min-height: 32px;
+  padding: 4px 10px;
+  border-radius: var(--radius);
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  cursor: pointer;
+  font-family: var(--font-sans);
+}
+html[data-app="connected"] .bezel:hover:not(:disabled) {
+  border-color: var(--hairline);
+  background: var(--surface-2);
+}
+html[data-app="connected"] .bezel.active {
+  background: var(--text);
+  color: var(--bg);
+  border-color: var(--text);
+}

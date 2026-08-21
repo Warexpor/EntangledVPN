@@ -24,6 +24,7 @@ export const status = writable({
 
 export const peers = writable([])
 export const view = writable('connect')
+export const chatOpen = writable(false)
 export const notifications = writable([])
 export const durableError = writable(null)
 export const chatThreads = writable({})
@@ -97,9 +98,8 @@ export function addChatMessage(fromID, nickname, message, isSelf = false, delive
     }
   })
 
-  const viewing = get(view)
   const active = activeThreadKey()
-  if (!isSelf && !(viewing === 'chat' && storeKey === active)) {
+  if (!isSelf && !(get(chatOpen) && storeKey === active)) {
     unread.update(u => ({ ...u, [storeKey]: (u[storeKey] || 0) + 1 }))
   }
 }

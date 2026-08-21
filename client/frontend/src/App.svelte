@@ -1,10 +1,10 @@
 <script>
   import { onMount, onDestroy } from 'svelte'
-  import { status, peers, view, settings, notifications, durableError, clearDurableError, addNotification, addChatMessage, addSystemChat } from './lib/stores/app.js'
-  import { currentLang, setLang, t, fmt } from './lib/locales/index.js'
+  import { status, peers, view, settings, notifications, durableError, clearDurableError, addNotification, addChatMessage, addSystemChat, chatOpen } from './lib/stores/app.js'
+  import { setLang, t, fmt } from './lib/locales/index.js'
   import Sidebar from './lib/components/Sidebar.svelte'
   import PeerList from './lib/components/PeerList.svelte'
-  import StatusBar from './lib/components/StatusBar.svelte'
+  import Topbar from './lib/components/Topbar.svelte'
   import ConnectView from './lib/components/ConnectView.svelte'
   import ChatView from './lib/components/ChatView.svelte'
   import SettingsView from './lib/components/SettingsView.svelte'
@@ -20,17 +20,26 @@
   }
 
   $: {
-    if ($settings.theme === 'light') {
-      document.documentElement.classList.add('light-theme')
-    } else {
-      document.documentElement.classList.remove('light-theme')
-    }
+    const root = document.documentElement
+    const light = $settings.theme === 'light'
+    root.classList.toggle('light-theme', light)
+    root.dataset.theme = light ? 'light' : 'dark'
+    root.dataset.app = $view === 'connect' ? 'connect' : 'connected'
   }
 
   let sidebarWidth = 220
   let isDragging = false
   let startX, startWidth
   let mounted = true
+
+  function derivePathAggregate(st, list) {
+    if (st.reconnecting) return 'reconnecting'
+    if (!st.connected) return 'disconnected'
+    const relay = (list || []).some((p) => p.connected && (p.path === 'relay' || p.path === 'ws'))
+    return relay ? 'relay' : 'direct'
+  }
+
+  $: pathAggregate = derivePathAggregate($status, $peers)
 
   function onDragStart(e) {
     isDragging = true
@@ -127,17 +136,25 @@
   })
 </script>
 
-<div class="space-bg" aria-hidden="true"></div>
-<div class="space-dust" aria-hidden="true"></div>
-
 {#if $view === 'connect'}
+  <div class="space-bg" aria-hidden="true"></div>
+  <div class="space-dust" aria-hidden="true"></div>
   <div class="shell connect-shell">
     <div class="fullscreen-connect">
       <ConnectView />
     </div>
   </div>
 {:else}
-  <div class="shell">
+  <div class="shell bench">
+    <!--
+      THESIS: Connected shell is a signal bench. Path quality is the trigger, not a Discord three-pane reskin.
+      OWN-WORLD: Matte B&W panels, 1px hairlines, tracked labels over mono values. --live green only for Direct/p2p. --fault red only for relay, unread, error. No wash or grain.
+      STORY: You are in a room with a copyable VIP. Peers are channels. Direct vs relay reads first.
+      FIRST VIEWPORT: Readout band (room, VIP, path LEDs, theme, settings, disconnect). Quiet rail left. Graticule channels center. Chat as right readout. Settings in the same bezel language.
+      FORM: Oscilloscope signal-bench fused with PRODUCT B&W. Seed 82f5fa76. Comp A topology. User B&W steer.
+      FINISH: unreviewed and undocumented is unfinished; this build ends with the finish review, the verdict, and DESIGN.md
+    -->
+    <Topbar {pathAggregate} />
     <div class="layout">
       <div class="sidebar-wrapper" style="width: {sidebarWidth}px">
         <Sidebar />
@@ -150,21 +167,19 @@
       </div>
 
       <main class="main-area">
-        <div class="view-fade" key={$view}>
-          {#if $view === 'network'}
-            <PeerList />
-          {:else if $view === 'chat'}
+        <div class="workspace">
+          <div class="peer-pane" hidden={$view === 'settings'}>
+            <PeerList {pathAggregate} />
+          </div>
+          <div class="chat-pane" hidden={$view === 'settings' || !$chatOpen}>
             <ChatView />
-          {:else if $view === 'settings'}
+          </div>
+          <div class="settings-pane" hidden={$view !== 'settings'}>
             <SettingsView />
-          {:else}
-            <div class="unknown-view">Unknown view: {$view}</div>
-          {/if}
+          </div>
         </div>
       </main>
     </div>
-
-    <StatusBar />
   </div>
 {/if}
 
@@ -179,7 +194,6 @@
 
 {#each $notifications as notif (notif.id)}
   <div class="notification {notif.type}" role="status">
-    <span class="notif-icon">{notif.type === 'error' ? '!' : '>'}</span>
     {notif.msg}
   </div>
 {/each}
@@ -214,7 +228,7 @@
   .sidebar-wrapper {
     position: relative;
     flex-shrink: 0;
-    background: var(--bg-surface);
+    background: var(--surface);
     border-right: 1px solid var(--border);
     display: flex;
     flex-direction: column;
@@ -229,7 +243,7 @@
     cursor: col-resize;
     z-index: 10;
     background: transparent;
-    transition: background 0.1s;
+    transition: background var(--dur-mid, 280ms) var(--ease-out, ease);
   }
   .drag-handle:hover, .drag-handle.active, .drag-handle:focus-visible {
     background: var(--border-hover);
@@ -239,40 +253,50 @@
     display: flex;
     flex-direction: column;
     overflow: hidden;
-    background: var(--bg-primary);
+    background: var(--bg);
     min-width: 0;
     min-height: 0;
   }
-  .view-fade {
+  .workspace {
     flex: 1;
     display: flex;
-    flex-direction: column;
     min-height: 0;
     min-width: 0;
-    animation: viewIn 0.2s ease-out;
   }
-  @keyframes viewIn {
-    0% { opacity: 0; transform: translateY(8px); }
-    100% { opacity: 1; transform: translateY(0); }
+  .peer-pane, .settings-pane {
+    flex: 1;
+    min-width: 0;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
   }
-  .unknown-view {
-    padding: 40px;
-    color: var(--text-muted);
+  .peer-pane[hidden], .chat-pane[hidden], .settings-pane[hidden] {
+    display: none !important;
+  }
+  .chat-pane {
+    flex: 0 0 42%;
+    max-width: 480px;
+    min-width: 280px;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    border-left: 1px solid var(--border);
   }
   .error-strip {
     position: fixed;
-    left: 12px;
-    right: 12px;
-    bottom: calc(var(--statusbar-height) + 12px);
+    left: 16px;
+    right: 16px;
+    bottom: 16px;
     z-index: 1100;
     display: flex;
     align-items: center;
     gap: 12px;
-    padding: 10px 14px;
-    background: var(--bg-raised);
-    border: 1px solid var(--error);
-    color: var(--error);
-    font-size: var(--font-size-sm);
+    padding: 12px 14px;
+    background: var(--surface-2, var(--bg-raised, #111));
+    border: 1px solid var(--fault, var(--error, #c41e1e));
+    border-radius: var(--radius, 2px);
+    color: var(--fault, var(--error, #c41e1e));
+    font-size: var(--font-size-sm, 13px);
   }
   .error-strip-msg {
     flex: 1;
@@ -283,42 +307,34 @@
     flex-shrink: 0;
     min-height: 32px;
     padding: 4px 10px;
-    border: 1px solid var(--error);
+    border: 1px solid var(--fault, var(--error, #c41e1e));
+    border-radius: var(--radius, 2px);
     background: transparent;
-    color: var(--error);
+    color: var(--fault, var(--error, #c41e1e));
     cursor: pointer;
-    font-family: var(--font-mono);
-    font-size: var(--font-size-xs);
-    text-transform: uppercase;
+    font-family: inherit;
+    font-size: 13px;
+    text-transform: none;
   }
   .error-strip-dismiss:hover {
-    background: rgba(196, 92, 92, 0.12);
+    background: color-mix(in srgb, var(--fault, #c41e1e) 12%, transparent);
   }
   .notification {
     position: fixed;
-    top: 12px;
-    right: 12px;
-    padding: 6px 12px;
-    font-size: var(--font-size-sm);
+    top: 16px;
+    right: 16px;
+    padding: 12px 16px;
+    font-size: 13px;
+    font-weight: 500;
     z-index: 1000;
-    background: var(--bg-raised);
-    border: 1px solid var(--border);
-    color: var(--text-primary);
-    animation: slideIn 0.15s ease-out;
+    background: var(--surface-2, var(--bg-raised, #111));
+    border: 1px solid var(--border, #2a2a2a);
+    border-radius: var(--radius, 2px);
+    color: var(--text, var(--text-bright, #f5f5f5));
+    max-width: min(360px, calc(100vw - 2rem));
   }
   .notification.error {
-    border-color: var(--error);
-    color: var(--error);
-  }
-  .notification.info {
-    border-color: var(--border);
-  }
-  .notif-icon {
-    margin-right: 6px;
-    font-weight: 700;
-  }
-  @keyframes slideIn {
-    from { transform: translateX(100%); opacity: 0; }
-    to { transform: translateX(0); opacity: 1; }
+    border-color: var(--fault, var(--error, #c41e1e));
+    color: var(--fault, var(--error, #c41e1e));
   }
 </style>
