@@ -1,4 +1,4 @@
-import { status, view, peers, settings, addChatMessage } from './stores/app.js'
+import { status, view, peers, settings, addChatMessage, chatOpen } from './stores/app.js'
 
 const SIM = import.meta.env.DEV && !window.go
 const jumpConnected = SIM && new URLSearchParams(location.search).has('connected')
@@ -61,6 +61,7 @@ function enterConnected(room) {
   status.set(connectedStatus(room))
   peers.set(simPeers.map((p) => ({ ...p })))
   view.set('network')
+  chatOpen.set(true)
 }
 
 if (SIM) {
@@ -128,6 +129,7 @@ if (SIM) {
             phase: 'idle',
           })
           peers.set([])
+          chatOpen.set(false)
         },
         SendChat: async (peerId, message) => {
           const peer = simPeers.find((p) => p.id === peerId)

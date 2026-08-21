@@ -5,10 +5,20 @@
   import ConfirmDialog from './ConfirmDialog.svelte'
 
   export let pathAggregate = 'disconnected'
+  export let relayCount = 0
+
+  const PATH_TICKS = 7
+  const PATH_FILL = {
+    direct: { n: 7, tone: 'live' },
+    relay: { n: 5, tone: 'fault' },
+    reconnecting: { n: 3, tone: 'fault' },
+    disconnected: { n: 0, tone: 'idle' },
+  }
 
   $: pathLive = pathAggregate === 'direct'
   $: pathFault = pathAggregate === 'relay' || pathAggregate === 'reconnecting'
   $: pathIdle = pathAggregate === 'disconnected'
+  $: pathFill = PATH_FILL[pathAggregate] || PATH_FILL.disconnected
   $: pathLabel = pathAggregate === 'reconnecting'
     ? $t.status_reconnecting
     : pathAggregate === 'relay'
@@ -60,6 +70,9 @@
 
 <header class="topbar">
   <div class="topbar-row">
+    <div class="cell brand">
+      <span class="wordmark">{$t.brand}</span>
+    </div>
     <button type="button" class="cell room" on:click={goHome} title={$t.network}>
       <span class="label-track">{$t.network}</span>
       <span class="cell-value">{$status.room || $t.network}</span>
@@ -72,7 +85,7 @@
       title={$t.virtual_ip}
     >
       <span class="label-track">{$t.virtual_ip}</span>
-      <span class="cell-value mono">{$status.virtualIP || $t.na}</span>
+      <span class="cell-value mono vip-value">{$status.virtualIP || $t.na}</span>
     </button>
     <div class="cell path" role="status" aria-live="polite">
       <span class="label-track">{$t.col_path}</span>
@@ -82,12 +95,26 @@
           <span class="led fault" class:on={pathFault}></span>
           <span class="led idle" class:on={pathIdle}></span>
         </span>
-        <span class="cell-value" class:live={pathLive} class:fault={pathFault}>{pathLabel}</span>
+        <span class="cell-value path-value" class:live={pathLive} class:fault={pathFault}>{pathLabel}</span>
+      </span>
+      <span class="seg-bar" aria-hidden="true">
+        {#each Array(PATH_TICKS) as _, i}
+          <span
+            class="seg"
+            class:on={i < pathFill.n}
+            class:live={pathFill.tone === 'live'}
+            class:fault={pathFill.tone === 'fault'}
+          ></span>
+        {/each}
       </span>
     </div>
     <div class="cell peers">
       <span class="label-track">{$t.peers_list}</span>
       <span class="cell-value mono">{$status.peerCount}</span>
+    </div>
+    <div class="cell peers">
+      <span class="label-track">{$t.path_relay}</span>
+      <span class="cell-value mono">{relayCount}</span>
     </div>
     <div class="actions">
       <ThemeToggle chrome />
@@ -120,7 +147,7 @@
     display: flex;
     align-items: stretch;
     gap: 0;
-    min-height: 64px;
+    min-height: 72px;
   }
   .cell {
     display: flex;
@@ -147,9 +174,22 @@
     opacity: 1;
   }
   button.cell:disabled:hover .cell-value { color: var(--text); }
+  .brand {
+    flex: 0 0 auto;
+    justify-content: center;
+    padding-right: 18px;
+  }
+  .wordmark {
+    font-size: 11px;
+    font-weight: 500;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--text);
+    line-height: 1.2;
+  }
   .room { flex: 1.4 1 140px; }
-  .vip { flex: 1 1 148px; }
-  .path { flex: 1.2 1 180px; }
+  .vip { flex: 1 1 168px; }
+  .path { flex: 1.4 1 200px; }
   .peers { flex: 0 0 72px; }
   .cell-value {
     font-size: 1.05rem;
@@ -167,6 +207,17 @@
     letter-spacing: 0;
     font-size: 1rem;
   }
+  .vip-value {
+    font-size: 1.35rem;
+    font-weight: 500;
+    letter-spacing: 0.02em;
+  }
+  .path-value {
+    font-family: var(--font-mono);
+    font-size: 1.22rem;
+    font-weight: 500;
+    letter-spacing: 0;
+  }
   .cell-value.live { color: var(--live); }
   .cell-value.fault { color: var(--fault); }
   .path-row {
@@ -180,6 +231,18 @@
     gap: 4px;
     flex-shrink: 0;
   }
+  .seg-bar {
+    display: flex;
+    gap: 3px;
+    margin-top: 2px;
+  }
+  .seg {
+    flex: 1;
+    height: 3px;
+    background: var(--text-dim);
+  }
+  .seg.on.live { background: var(--live); }
+  .seg.on.fault { background: var(--fault); }
   .actions {
     display: flex;
     align-items: center;

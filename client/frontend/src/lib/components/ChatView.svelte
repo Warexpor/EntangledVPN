@@ -127,10 +127,7 @@
 
 <div class="chat-view">
   <div class="section-head">
-    <div>
-      <span class="label-track">{$t.chat}</span>
-      <h2>{title}</h2>
-    </div>
+    <h2>{title}</h2>
     <button type="button" class="bezel" on:click={closeChat}>{$t.close_chat}</button>
   </div>
 
@@ -190,7 +187,7 @@
   }
   .section-head {
     display: flex;
-    align-items: flex-end;
+    align-items: center;
     justify-content: space-between;
     gap: 12px;
     margin-bottom: 8px;
@@ -203,7 +200,7 @@
     font-weight: 600;
     letter-spacing: -0.03em;
     color: var(--text);
-    margin: 2px 0 0;
+    margin: 0;
   }
   .chat-messages {
     flex: 1;

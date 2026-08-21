@@ -40,6 +40,7 @@
   }
 
   $: pathAggregate = derivePathAggregate($status, $peers)
+  $: relayCount = ($peers || []).filter((p) => p.connected && (p.path === 'relay' || p.path === 'ws')).length
 
   function onDragStart(e) {
     isDragging = true
@@ -87,6 +88,7 @@
         if (!mounted) return
         status.set(data)
         if (!data.connected && !data.reconnecting) {
+          chatOpen.set(false)
           view.set('connect')
         }
       })
@@ -154,7 +156,7 @@
       FORM: Oscilloscope signal-bench fused with PRODUCT B&W. Seed 82f5fa76. Comp A topology. User B&W steer.
       FINISH: unreviewed and undocumented is unfinished; this build ends with the finish review, the verdict, and DESIGN.md
     -->
-    <Topbar {pathAggregate} />
+    <Topbar {pathAggregate} {relayCount} />
     <div class="layout">
       <div class="sidebar-wrapper" style="width: {sidebarWidth}px">
         <Sidebar />

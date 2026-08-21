@@ -310,7 +310,13 @@
             aria-label={$t.more_actions}
             title={$t.more_actions}
             on:click={(e) => toggleMenu(e, room.name)}
-          >⋯</button>
+          >
+            <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true">
+              <circle cx="3.5" cy="8" r="0.9" />
+              <circle cx="8" cy="8" r="0.9" />
+              <circle cx="12.5" cy="8" r="0.9" />
+            </svg>
+          </button>
           {#if menuOpen === room.name}
             <div class="overflow-menu" role="menu" tabindex="-1" on:click|stopPropagation on:keydown|stopPropagation>
               <button type="button" role="menuitem" class="menu-item" on:click={(e) => menuAction(e, () => copyInvite(room))}>
@@ -541,6 +547,11 @@
     display: flex;
     align-items: center;
     justify-content: center;
+  }
+  .menu-btn svg {
+    width: 16px;
+    height: 16px;
+    display: block;
   }
   .menu-btn:hover, .menu-btn[aria-expanded="true"] {
     color: var(--text);

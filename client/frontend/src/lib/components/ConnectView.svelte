@@ -1,6 +1,6 @@
 <script>
   import { onMount } from 'svelte'
-  import { status, view, settings, addNotification, clearDurableError } from '../stores/app.js'
+  import { status, view, settings, chatOpen, addNotification, clearDurableError } from '../stores/app.js'
   import { t, fmt } from '../locales/index.js'
 
   let serverAddr = ''
@@ -38,6 +38,7 @@
       const s = await window.go.main.App.Connect(serverAddr, nickname)
       status.set(s)
       view.set('network')
+      chatOpen.set(true)
       addNotification(fmt($t.notif_connected, { addr: serverAddr }))
       fieldErrors = {}
     } catch (e) {
@@ -71,6 +72,7 @@
       await window.go.main.App.JoinRoom(p.room, p.password || '')
       addNotification(fmt($t.notif_joined, { name: p.room }))
       view.set('network')
+      chatOpen.set(true)
     } catch (e) {
       addNotification(fmt($t.error_join, { err: e }), 'error')
       connecting = false
@@ -89,6 +91,7 @@
     try {
       await window.go.main.App.Disconnect()
       status.set({ connected: false, reconnecting: false, server: '', room: '', virtualIP: '', peerCount: 0, isOwner: false, phase: 'idle' })
+      chatOpen.set(false)
       view.set('connect')
       addNotification($t.notif_disconnected)
     } catch (e) {

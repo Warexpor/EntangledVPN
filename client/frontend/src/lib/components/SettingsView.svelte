@@ -130,10 +130,7 @@
 
 <div class="settings-view">
   <div class="section-head">
-    <div>
-      <span class="label-track">{$t.settings}</span>
-      <h2>{$t.settings_title}</h2>
-    </div>
+    <h2>{$t.settings_title}</h2>
     <span class="ver">v{version}</span>
   </div>
   <div class="settings-content">
@@ -144,7 +141,11 @@
   <article class="card">
     <div class="card-head">
       <button type="button" class="card-disclosure" aria-expanded={open.connection} on:click={() => toggle('connection')}>
-        <span class="collapse-chevron" class:collapsed={!open.connection} aria-hidden="true">▼</span>
+        <span class="collapse-chevron" class:collapsed={!open.connection} aria-hidden="true">
+          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="square">
+            <path d="M3 5.5 8 10.5 13 5.5" />
+          </svg>
+        </span>
         <span class="card-title">{$t.section_connection}</span>
       </button>
     </div>
@@ -186,7 +187,11 @@
   <article class="card">
     <div class="card-head">
       <button type="button" class="card-disclosure" aria-expanded={open.network} on:click={() => toggle('network')}>
-        <span class="collapse-chevron" class:collapsed={!open.network} aria-hidden="true">▼</span>
+        <span class="collapse-chevron" class:collapsed={!open.network} aria-hidden="true">
+          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="square">
+            <path d="M3 5.5 8 10.5 13 5.5" />
+          </svg>
+        </span>
         <span class="card-title">{$t.section_network}</span>
       </button>
     </div>
@@ -230,7 +235,11 @@
   <article class="card">
     <div class="card-head">
       <button type="button" class="card-disclosure" aria-expanded={open.system} on:click={() => toggle('system')}>
-        <span class="collapse-chevron" class:collapsed={!open.system} aria-hidden="true">▼</span>
+        <span class="collapse-chevron" class:collapsed={!open.system} aria-hidden="true">
+          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="square">
+            <path d="M3 5.5 8 10.5 13 5.5" />
+          </svg>
+        </span>
         <span class="card-title">{$t.section_system}</span>
       </button>
     </div>
@@ -271,7 +280,11 @@
   <article class="card">
     <div class="card-head">
       <button type="button" class="card-disclosure" aria-expanded={open.appearance} on:click={() => toggle('appearance')}>
-        <span class="collapse-chevron" class:collapsed={!open.appearance} aria-hidden="true">▼</span>
+        <span class="collapse-chevron" class:collapsed={!open.appearance} aria-hidden="true">
+          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="square">
+            <path d="M3 5.5 8 10.5 13 5.5" />
+          </svg>
+        </span>
         <span class="card-title">{$t.section_appearance}</span>
       </button>
     </div>
@@ -341,7 +354,7 @@
   }
   .section-head {
     display: flex;
-    align-items: flex-end;
+    align-items: center;
     justify-content: space-between;
     gap: 12px;
     margin-bottom: 12px;
@@ -352,7 +365,7 @@
     font-weight: 600;
     letter-spacing: -0.03em;
     color: var(--text);
-    margin: 2px 0 0;
+    margin: 0;
   }
   .settings-content {
     flex: 1;

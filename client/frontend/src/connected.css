@@ -297,9 +297,13 @@ html[data-app="connected"] .collapse-chevron {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  font-size: 10px;
   transition: transform var(--dur-mid) var(--ease-out);
   flex-shrink: 0;
+}
+html[data-app="connected"] .collapse-chevron svg {
+  width: 12px;
+  height: 12px;
+  display: block;
 }
 html[data-app="connected"] .collapse-chevron.collapsed {
   transform: rotate(-90deg);

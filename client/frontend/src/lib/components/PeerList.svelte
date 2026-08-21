@@ -89,10 +89,7 @@
 
 <div class="peer-view">
   <div class="section-head">
-    <div>
-      <span class="label-track">{$t.channels}</span>
-      <h2>{$status.room || $t.peers_list}</h2>
-    </div>
+    <h2>{$t.channels} {$status.room || $t.peers_list}</h2>
     {#if $status.room}
       <button type="button" class="bezel" on:click={openRoomChat}>
         {$t.room_chat}
@@ -200,7 +197,7 @@
   }
   .section-head {
     display: flex;
-    align-items: flex-end;
+    align-items: center;
     justify-content: space-between;
     gap: 12px;
     margin-bottom: 10px;
@@ -210,7 +207,7 @@
     font-weight: 600;
     letter-spacing: -0.03em;
     color: var(--text);
-    margin: 2px 0 0;
+    margin: 0;
   }
   .section-hint {
     color: var(--muted);
