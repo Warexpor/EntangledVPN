@@ -4,6 +4,10 @@
 
 Create a virtual LAN (`10.242.0.0/24`), chat, and play over P2P UDP with automatic relay fallback when NAT wins. Settings → **Connection**: Direct (default) or Relay (force server path).
 
+<p align="center">
+  <img src="docs/showcase.png" alt="Entangled VPN — connect screen" width="720" />
+</p>
+
 | | |
 |---|---|
 | **Client** | Windows — Wails + Wintun (run as Administrator) |
