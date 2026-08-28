@@ -1,4 +1,4 @@
-import { writable, get } from 'svelte/store'
+import { writable, derived, get } from 'svelte/store'
 
 export const MAX_MESSAGES = 500
 
@@ -29,6 +29,7 @@ export const durableError = writable(null)
 export const chatThreads = writable({})
 export const chatTarget = writable(null)
 export const unread = writable({})
+export const pendingJoin = writable('')
 
 let notifId = 0
 let chatId = 0
@@ -43,6 +44,10 @@ export function addNotification(msg, type = 'info') {
   if (type === 'error') {
     setDurableError(msg)
   }
+}
+
+export function removeNotification(id) {
+  notifications.update(n => n.filter(x => x.id !== id))
 }
 
 export function setDurableError(msg) {
@@ -83,6 +88,7 @@ export function addChatMessage(fromID, nickname, message, isSelf = false, delive
     const list = threads[storeKey] ? [...threads[storeKey]] : []
     list.push({
       id: isSelf && fromID.startsWith('local_') ? fromID : id,
+      threadKey: storeKey,
       fromID,
       nickname,
       message,
@@ -116,8 +122,7 @@ export function markThreadRead(key) {
   })
 }
 
-export function updateMessageStatus(localId, delivery) {
-  const key = activeThreadKey()
+export function updateMessageStatus(localId, delivery, key = activeThreadKey()) {
   chatThreads.update(threads => {
     const list = threads[key]
     if (!list) return threads
@@ -128,10 +133,7 @@ export function updateMessageStatus(localId, delivery) {
   })
 }
 
-export const chatMessages = {
-  subscribe(run) {
-    return chatThreads.subscribe(threads => {
-      run(threads[activeThreadKey()] || [])
-    })
-  },
-}
+export const chatMessages = derived(
+  [chatThreads, chatTarget, status],
+  ([$chatThreads, $chatTarget, $status]) => $chatThreads[threadKey($chatTarget, $status.room)] || [],
+)

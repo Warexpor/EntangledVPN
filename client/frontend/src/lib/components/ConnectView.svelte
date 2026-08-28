@@ -2,6 +2,7 @@
   import { onMount } from 'svelte'
   import { status, view, settings, addNotification, clearDurableError } from '../stores/app.js'
   import { t, fmt } from '../locales/index.js'
+  import ConfirmDialog from './ConfirmDialog.svelte'
 
   let serverAddr = ''
   let nickname = ''
@@ -9,6 +10,7 @@
   let connecting = false
   let showInvite = false
   let fieldErrors = {}
+  let showDisconnectConfirm = false
 
   onMount(async () => {
     const cfg = await window.go.main.App.LoadConfig()
@@ -16,7 +18,9 @@
     if (cfg.nickname) nickname = cfg.nickname
     if (cfg) settings.set({ ...$settings, ...cfg })
 
-    if (cfg.autoConnect && cfg.serverAddr && cfg.nickname) {
+    const manuallyDisconnected = localStorage.getItem('entangled_manual_disconnect') === '1'
+    localStorage.removeItem('entangled_manual_disconnect')
+    if (!manuallyDisconnected && cfg.autoConnect && cfg.serverAddr && cfg.nickname) {
       connect()
     }
   })
@@ -37,6 +41,7 @@
     try {
       const s = await window.go.main.App.Connect(serverAddr, nickname)
       status.set(s)
+      $settings = { ...$settings, serverAddr, nickname }
       view.set('network')
       addNotification(fmt($t.notif_connected, { addr: serverAddr }))
       fieldErrors = {}
@@ -84,8 +89,13 @@
     }
   }
 
-  async function disconnect() {
-    if (!confirm($t.confirm_disconnect)) return
+  function disconnect() {
+    showDisconnectConfirm = true
+  }
+
+  async function executeDisconnect() {
+    showDisconnectConfirm = false
+    localStorage.setItem('entangled_manual_disconnect', '1')
     try {
       await window.go.main.App.Disconnect()
       status.set({ connected: false, reconnecting: false, server: '', room: '', virtualIP: '', peerCount: 0, isOwner: false, phase: 'idle' })
@@ -117,10 +127,11 @@
           id="server-input"
           type="text"
           bind:value={serverAddr}
-          placeholder="host:8080"
+          placeholder={$t.server_placeholder}
           class:invalid={fieldErrors.serverAddr}
           aria-invalid={!!fieldErrors.serverAddr}
           aria-describedby={fieldErrors.serverAddr ? 'server-err' : undefined}
+          on:keydown={(e) => e.key === 'Enter' && (e.preventDefault(), connect())}
         />
         {#if fieldErrors.serverAddr}
           <span id="server-err" class="field-error" role="alert">{fieldErrors.serverAddr}</span>
@@ -132,7 +143,7 @@
           id="nick-input"
           type="text"
           bind:value={nickname}
-          placeholder="Player"
+          placeholder={$t.nickname_placeholder}
           class:invalid={fieldErrors.nickname}
           aria-invalid={!!fieldErrors.nickname}
           aria-describedby={fieldErrors.nickname ? 'nick-err' : undefined}
@@ -153,7 +164,7 @@
         <summary>{$t.paste_invite}</summary>
         <div class="invite-block">
           <label for="invite-input" class="sr-only">{$t.paste_invite}</label>
-          <input id="invite-input" type="text" bind:value={invite} placeholder={$t.invite_placeholder} />
+          <input id="invite-input" type="text" bind:value={invite} placeholder={$t.invite_placeholder} on:keydown={(e) => e.key === 'Enter' && (e.preventDefault(), applyInvite())} />
           <button class="secondary-btn" on:click={applyInvite} disabled={connecting}>{$t.join}</button>
         </div>
       </details>
@@ -237,7 +248,7 @@
     letter-spacing: 0.08em;
   }
   input {
-    background: rgba(17, 17, 17, 0.85);
+    background: var(--input-bg);
     border: 1px solid var(--border-light);
     color: var(--text-bright);
     padding: 13px 14px;
@@ -253,9 +264,12 @@
     border-color: var(--border-hover);
   }
   input:focus {
-    outline: none;
     border-color: var(--text-bright);
-    background: rgba(20, 20, 20, 0.95);
+    background: var(--input-bg-focus);
+  }
+  input:focus-visible {
+    outline: 2px solid var(--focus-ring);
+    outline-offset: 2px;
   }
   input.invalid {
     border-color: var(--error);
@@ -381,10 +395,14 @@
     clip: rect(0, 0, 0, 0);
     border: 0;
   }
-  :global(.light-theme) input {
-    background: rgba(255, 255, 255, 0.65);
-  }
-  :global(.light-theme) input:focus {
-    background: rgba(255, 255, 255, 0.9);
-  }
 </style>
+
+{#if showDisconnectConfirm}
+  <ConfirmDialog
+    open={true}
+    message={$t.confirm_disconnect}
+    danger={true}
+    on:cancel={() => (showDisconnectConfirm = false)}
+    on:confirm={executeDisconnect}
+  />
+{/if}

@@ -1,3 +1,3 @@
 package vpncore
 
-const AppVersion = "1.2.8"
+const AppVersion = "1.3.0"

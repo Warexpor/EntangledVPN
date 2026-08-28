@@ -9,12 +9,15 @@
 }
 
 :root {
+  --ui-scale:       1;
   --bg-deep:      #000000;
   --bg-primary:   #050505;
   --bg-surface:   #0a0a0a;
   --bg-raised:    #111111;
   --bg-hover:     #181818;
   --bg-active:    #1f1f1f;
+  --input-bg:     #111111;
+  --input-bg-focus: #141414;
   --border-deep:  #111111;
   --border:       #1c1c1c;
   --border-light: #2a2a2a;
@@ -25,19 +28,26 @@
   --text-muted:   #5c5c5c;
   --text-dim:     #3a3a3a;
   --accent:       #f0f0f0;
-  --accent-hover: #ffffff;
+  --accent-hover: #cecece;
   --accent-ink:   #000000;
-  --success:      #9a9a9a;
-  --warning:      #c8c8c8;
-  --error:        #c45c5c;
+  --success:      #2fbf62;
+  --warning:      #ffffff;
+  --warning-surface: rgba(255, 255, 255, 0.1);
+  --error:        #e23d3d;
+  --error-surface: rgba(226, 61, 61, 0.1);
   --focus-ring:   #f0f0f0;
+  --z-drag:       10;
+  --z-menu:       20;
+  --z-modal:      100;
+  --z-toast:      1000;
+  --z-alert:      1100;
   --sidebar-width: 220px;
   --statusbar-height: 28px;
   --font-display: 'Bungee', ui-sans-serif, system-ui, sans-serif;
   --font-mono: ui-monospace, 'Cascadia Code', 'SF Mono', Consolas, 'Liberation Mono', monospace;
-  --font-size: 12px;
-  --font-size-sm: 11px;
-  --font-size-xs: 10px;
+  --font-size: calc(12px * var(--ui-scale));
+  --font-size-sm: calc(11px * var(--ui-scale));
+  --font-size-xs: calc(10px * var(--ui-scale));
   --line-height: 1.6;
 }
 
@@ -48,6 +58,8 @@
   --bg-raised:    #e0e0e0;
   --bg-hover:     #d8d8d8;
   --bg-active:    #cfcfcf;
+  --input-bg:     #ffffff;
+  --input-bg-focus: #ffffff;
   --border-deep:  #d0d0d0;
   --border:       #cccccc;
   --border-light: #bbbbbb;
@@ -58,11 +70,13 @@
   --text-muted:   #888888;
   --text-dim:     #aaaaaa;
   --accent:       #000000;
-  --accent-hover: #222222;
+  --accent-hover: #353535;
   --accent-ink:   #f5f5f5;
-  --success:      #555555;
-  --warning:      #333333;
-  --error:        #b33a3a;
+  --success:      #187a3b;
+  --warning:      #111111;
+  --warning-surface: rgba(0, 0, 0, 0.08);
+  --error:        #b32626;
+  --error-surface: rgba(179, 38, 38, 0.1);
   --focus-ring:   #000000;
 }
 
@@ -144,8 +158,8 @@ a:hover { text-decoration: underline; }
   color: var(--accent-ink);
   font-weight: 500;
 }
-.btn.primary:hover,
-.btn-save:hover {
+.btn.primary:hover:not(:disabled),
+.btn-save:hover:not(:disabled) {
   background: var(--accent-hover);
 }
 .btn:disabled {
@@ -156,9 +170,22 @@ a:hover { text-decoration: underline; }
   color: var(--error);
   border-color: var(--error);
 }
+.btn.ghost {
+  background: transparent;
+}
+.btn.danger:hover:not(:disabled) {
+  background: rgba(226, 61, 61, 0.1);
+}
 .empty-state {
   padding: 16px;
   text-align: center;
   color: var(--text-muted);
   font-size: var(--font-size-sm);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+  }
 }

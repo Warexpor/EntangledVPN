@@ -6,9 +6,12 @@
 
   $: sortedPeers = [...$peers].sort((a, b) => (a.nickname || '').localeCompare(b.nickname || ''))
   $: roomUnread = $unread['room:' + ($status.room || 'network')] || 0
-  $: anyRelay = $peers.some(p => p.path === 'relay' || p.path === 'ws')
 
   function openPeerChat(peer) {
+    if (!peer.connected) {
+      addNotification($t.chat_peer_offline, 'error')
+      return
+    }
     chatTarget.set({ id: peer.id, nickname: peer.nickname || peer.id })
     markThreadRead('peer:' + peer.id)
     view.set('chat')
@@ -74,7 +77,7 @@
 <div class="peer-view">
   <div class="peer-header">
     <h2>{$status.room || $t.network}</h2>
-    <button class="ip-badge" on:click={() => copyIP($status.virtualIP)} title={$t.virtual_ip}>
+    <button class="ip-badge" on:click={() => copyIP($status.virtualIP)} title={$t.virtual_ip} aria-label={$t.copy_virtual_ip}>
       {$status.virtualIP || $t.na}
     </button>
     {#if $status.room}
@@ -82,9 +85,6 @@
         [ {$t.chat} ]
         {#if roomUnread > 0}<span class="badge">{roomUnread}</span>{/if}
       </button>
-    {/if}
-    {#if anyRelay}
-      <span class="relay-hint">{$t.status_relay_degraded}</span>
     {/if}
   </div>
 
@@ -183,17 +183,18 @@
     height: 100%;
   }
   .peer-header {
-    padding: 12px 16px;
+    padding: 16px;
     border-bottom: 1px solid var(--border);
     display: flex;
     align-items: center;
     gap: 10px;
     background: var(--bg-surface);
+    box-shadow: inset 0 -1px 0 var(--border-deep);
     flex-wrap: wrap;
   }
   .peer-header h2 {
-    font-size: var(--font-size);
-    font-weight: 500;
+    font-size: calc(var(--font-size) * 1.25);
+    font-weight: 600;
     color: var(--text-bright);
     text-transform: uppercase;
     letter-spacing: 0.5px;
@@ -222,10 +223,6 @@
     position: relative;
   }
   .room-chat-btn:hover { color: var(--text-bright); border-color: var(--border-hover); }
-  .relay-hint {
-    font-size: var(--font-size-xs);
-    color: var(--text-muted);
-  }
   .badge {
     display: inline-block;
     min-width: 14px;
@@ -245,14 +242,13 @@
   }
   .table-row {
     display: grid;
-    grid-template-columns: minmax(56px, 72px) minmax(72px, 1fr) minmax(88px, 110px) minmax(48px, 70px) minmax(52px, 72px) minmax(64px, 80px);
+    grid-template-columns: minmax(64px, 0.8fr) minmax(90px, 1.3fr) minmax(90px, 1fr) minmax(50px, 0.7fr) minmax(60px, 0.8fr) auto;
     gap: 8px;
     align-items: center;
     padding: 10px 16px;
     min-height: 40px;
     border-bottom: 1px solid var(--border-deep);
     font-size: var(--font-size-sm);
-    min-width: 520px;
   }
   .table-header-row {
     color: var(--text-muted);
@@ -321,4 +317,14 @@
     margin: 8px 0 4px;
   }
   .empty-desc { font-size: var(--font-size-xs); }
+  @media (max-width: 760px) {
+    .peer-header { padding: 10px 12px; }
+    .table-row { padding-left: 12px; padding-right: 12px; gap: 6px; }
+    .col-path { display: none; }
+    .table-row { grid-template-columns: minmax(58px, 0.8fr) minmax(82px, 1.3fr) minmax(78px, 1fr) minmax(48px, 0.7fr) auto; }
+  }
+  @media (max-width: 520px) {
+    .status-text { display: none; }
+    .table-row { grid-template-columns: 16px minmax(80px, 1fr) minmax(72px, 0.9fr) 48px auto; }
+  }
 </style>

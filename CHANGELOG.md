@@ -2,6 +2,23 @@
 
 ## Unreleased
 
+## 1.3.0 — 2026-08-28
+
+### Added
+
+- Connected-shell disconnect control, reconnect guidance, localized confirmation dialogs, and improved keyboard/focus support
+- Immediate UI-scale and theme persistence from Settings
+
+### Changed
+
+- Refined the connected UI with responsive layouts, clearer status colors, reduced-motion support, and a quieter peer roster
+- Locked saved networks now return to the password flow instead of attempting an empty-password join
+
+### Fixed
+
+- Connection readiness and room operations now report authenticated signaling and actual server results
+- Reconnect, deliberate disconnect, chat-thread switching, UDP shutdown, and DNS reset lifecycle behavior
+
 ## 1.2.8 — 2026-08-10
 
 ### Changed

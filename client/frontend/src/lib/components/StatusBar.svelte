@@ -1,9 +1,12 @@
 <script>
-  import { status, peers } from '../stores/app.js'
+  import { status, peers, view, addNotification } from '../stores/app.js'
   import { t, fmt } from '../locales/index.js'
   import { onMount } from 'svelte'
+  import ConfirmDialog from './ConfirmDialog.svelte'
 
   let version = '1.0.0'
+  let showDisconnectConfirm = false
+  let disconnecting = false
   onMount(async () => {
     try {
       if (window.go?.main?.App?.GetVersion) {
@@ -19,6 +22,26 @@
   $: statusTip = anyRelay && $status.connected
     ? $t.status_relay_degraded
     : statusLabel
+
+  function disconnect() {
+    showDisconnectConfirm = true
+  }
+
+  async function executeDisconnect() {
+    showDisconnectConfirm = false
+    disconnecting = true
+    localStorage.setItem('entangled_manual_disconnect', '1')
+    try {
+      await window.go.main.App.Disconnect()
+      status.set({ connected: false, reconnecting: false, server: '', room: '', virtualIP: '', peerCount: 0, isOwner: false, phase: 'idle' })
+      view.set('connect')
+      addNotification($t.notif_disconnected)
+    } catch (e) {
+      addNotification(fmt($t.error_disconnect, { err: e }), 'error')
+    } finally {
+      disconnecting = false
+    }
+  }
 </script>
 
 <footer class="statusbar" role="status" aria-live="polite">
@@ -47,6 +70,11 @@
     {#if $status.peerCount !== undefined}
       <span class="status-item">{fmt($t.status_peers, { n: $status.peerCount })}</span>
     {/if}
+    {#if $status.connected || $status.reconnecting}
+      <button type="button" class="disconnect-btn" on:click={disconnect} disabled={disconnecting}>
+        {disconnecting ? $t.disconnecting : $t.disconnect}
+      </button>
+    {/if}
     <span class="status-item status-ver">{fmt($t.version, { v: version })}</span>
   </div>
 </footer>
@@ -68,6 +96,7 @@
     z-index: 1;
     position: relative;
     min-width: 0;
+    overflow: hidden;
   }
   .status-left,
   .status-right {
@@ -75,7 +104,7 @@
     align-items: center;
     gap: 8px 14px;
     min-width: 0;
-    flex-wrap: wrap;
+    flex-wrap: nowrap;
   }
   .status-left {
     flex: 0 1 auto;
@@ -94,6 +123,20 @@
   .status-server { max-width: 28ch; }
   .status-room { max-width: 22ch; }
   .status-ver { flex-shrink: 0; max-width: none; }
+  .disconnect-btn {
+    flex-shrink: 0;
+    min-height: 24px;
+    padding: 2px 8px;
+    border: 1px solid var(--error);
+    color: var(--error);
+    font-family: var(--font-mono);
+    font-size: var(--font-size-xs);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+  .disconnect-btn:hover:not(:disabled) {
+    background: rgba(226, 61, 61, 0.1);
+  }
   .degraded { color: var(--warning); }
   .sq {
     display: inline-block;
@@ -105,4 +148,18 @@
   }
   .sq.sq-connected { background: var(--success); }
   .sq.sq-warn { background: var(--warning); }
+  @media (max-width: 760px) {
+    .status-right { gap: 8px; }
+    .status-server, .status-room, .status-ver { display: none; }
+  }
 </style>
+
+{#if showDisconnectConfirm}
+  <ConfirmDialog
+    open={true}
+    message={$t.confirm_disconnect}
+    danger={true}
+    on:cancel={() => (showDisconnectConfirm = false)}
+    on:confirm={executeDisconnect}
+  />
+{/if}

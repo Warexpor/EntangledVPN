@@ -21,14 +21,14 @@ type ClientConfig struct {
 	LastRoomName     string `json:"lastRoomName"`
 	LastRoomLocked   bool   `json:"lastRoomLocked"` // room needs password; password itself is never on disk
 	StartWithWindows bool   `json:"startWithWindows"`
-	ConnectionMode   string `json:"connectionMode"` // "direct" (default) | "relay"
+	ConnectionMode   string `json:"connectionMode"`    // "direct" (default) | "relay"
 	P2POnly          bool   `json:"p2pOnly,omitempty"` // legacy; migrated to connectionMode
 	MTU              int    `json:"mtu"`
 	DNSServer        string `json:"dnsServer"`
 	SOCKS5Proxy      string `json:"socks5Proxy"`
 	STUNServer       string `json:"stunServer"`
 	FontSize         int    `json:"fontSize,omitempty"` // legacy (ignored); prefer UiScale
-	UiScale          int    `json:"uiScale"`             // percent, 75–150
+	UiScale          int    `json:"uiScale"`            // percent, 75–150
 	Theme            string `json:"theme"`
 	Lang             string `json:"lang"`
 	ServerToken      string `json:"serverToken"`
@@ -37,6 +37,7 @@ type ClientConfig struct {
 type App struct {
 	vpn          *vpncore.VPNCore
 	mu           sync.Mutex
+	opMu         sync.Mutex
 	ctx          context.Context
 	lastRoomName string
 	lastRoomPass string // session-only; never written to rooms.json
@@ -428,7 +429,8 @@ func (a *App) ResetSettings() ClientConfig {
 }
 
 func (a *App) Connect(serverAddr, nickname string) (AppStatus, error) {
-	a.mu.Lock()
+	a.opMu.Lock()
+	defer a.opMu.Unlock()
 
 	cfg := a.LoadConfig()
 	cfg.ServerAddr = serverAddr
@@ -436,9 +438,8 @@ func (a *App) Connect(serverAddr, nickname string) (AppStatus, error) {
 	a.SaveConfig(cfg)
 	vpncore.Logger.Printf("Connect called: server=%s nickname=%s", serverAddr, nickname)
 
-	if a.vpn != nil {
-		a.vpn.Stop()
-	}
+	a.mu.Lock()
+	oldVPN := a.vpn
 
 	vpnCfg := &vpncore.VPNConfig{
 		ServerAddr: serverAddr,
@@ -450,19 +451,28 @@ func (a *App) Connect(serverAddr, nickname string) (AppStatus, error) {
 		SOCKS5Addr: cfg.SOCKS5Proxy,
 		AuthToken:  cfg.ServerToken,
 	}
-	a.vpn = vpncore.NewVPNCore(vpnCfg)
-	a.vpn.SetForceRelay(cfg.ForceRelay())
+	newVPN := vpncore.NewVPNCore(vpnCfg)
+	newVPN.SetForceRelay(cfg.ForceRelay())
 	for _, r := range a.loadRoomsRaw() {
 		if r.OwnerToken != "" {
-			a.vpn.SetOwnerToken(r.Name, r.OwnerToken)
+			newVPN.SetOwnerToken(r.Name, r.OwnerToken)
 		}
 	}
-	a.wireVPN(a.vpn)
+	a.wireVPN(newVPN)
+	a.vpn = newVPN
 	a.mu.Unlock()
+	if oldVPN != nil {
+		oldVPN.Stop()
+	}
 
-	err := a.vpn.Start()
+	err := newVPN.Start()
 	if err != nil {
 		vpncore.Logger.Printf("Connect failed: %v", err)
+		a.mu.Lock()
+		if a.vpn == newVPN {
+			a.vpn = nil
+		}
+		a.mu.Unlock()
 		return AppStatus{}, err
 	}
 
@@ -493,7 +503,15 @@ func (a *App) autoJoinLastRoom(cfg ClientConfig) {
 		return
 	}
 	vpncore.Logger.Printf("AutoJoinLastRoom: room=%s (sessionPass=%v)", room, pass != "")
-	a.vpn.JoinRoom(room, pass)
+	a.mu.Lock()
+	vpn := a.vpn
+	a.mu.Unlock()
+	if vpn != nil {
+		if err := vpn.JoinRoom(room, pass); err != nil {
+			vpncore.Logger.Printf("AutoJoinLastRoom failed: %v", err)
+			emitEvent("error", err.Error())
+		}
+	}
 }
 
 func (a *App) wireVPN(vpn *vpncore.VPNCore) {
@@ -541,43 +559,81 @@ func (a *App) wireVPN(vpn *vpncore.VPNCore) {
 }
 
 func (a *App) Disconnect() {
+	a.opMu.Lock()
+	defer a.opMu.Unlock()
+
 	a.mu.Lock()
-	defer a.mu.Unlock()
-	if a.vpn != nil {
-		a.vpn.Stop()
+	vpn := a.vpn
+	a.vpn = nil
+	a.mu.Unlock()
+	if vpn != nil {
+		vpn.Stop()
 	}
 }
 
-func (a *App) CreateRoom(name, password string) {
+func (a *App) CreateRoom(name, password string) error {
+	a.opMu.Lock()
+	defer a.opMu.Unlock()
+
+	a.mu.Lock()
+	vpn := a.vpn
+	a.mu.Unlock()
+	if vpn == nil {
+		return fmt.Errorf("not connected")
+	}
+	if err := vpn.CreateRoom(name, password); err != nil {
+		return err
+	}
 	a.lastRoomName = name
 	a.lastRoomPass = password
 	a.SaveRoom(name, password)
 	a.persistLastRoom(name, password != "")
-	if a.vpn != nil {
-		a.vpn.CreateRoom(name, password)
-	}
+	return nil
 }
 
-func (a *App) JoinRoom(name, password string) {
+func (a *App) JoinRoom(name, password string) error {
+	a.opMu.Lock()
+	defer a.opMu.Unlock()
+
+	a.mu.Lock()
+	vpn := a.vpn
+	a.mu.Unlock()
+	if vpn == nil {
+		return fmt.Errorf("not connected")
+	}
+	if err := vpn.JoinRoom(name, password); err != nil {
+		return err
+	}
 	a.lastRoomName = name
 	a.lastRoomPass = password
 	a.SaveRoom(name, password)
 	a.persistLastRoom(name, password != "")
-	if a.vpn != nil {
-		a.vpn.JoinRoom(name, password)
-	}
+	return nil
 }
 
 func (a *App) LeaveRoom() {
-	if a.vpn != nil {
-		a.vpn.LeaveRoom()
+	a.opMu.Lock()
+	defer a.opMu.Unlock()
+
+	a.mu.Lock()
+	vpn := a.vpn
+	a.mu.Unlock()
+	if vpn != nil {
+		vpn.LeaveRoom()
 	}
 }
 
-func (a *App) DeleteRoom(name string) {
-	if a.vpn != nil {
-		a.vpn.DeleteRoom(name)
+func (a *App) DeleteRoom(name string) error {
+	a.opMu.Lock()
+	defer a.opMu.Unlock()
+
+	a.mu.Lock()
+	vpn := a.vpn
+	a.mu.Unlock()
+	if vpn != nil {
+		return vpn.DeleteRoom(name)
 	}
+	return fmt.Errorf("not connected")
 }
 
 func (a *App) GetPeers() []PeerInfo {

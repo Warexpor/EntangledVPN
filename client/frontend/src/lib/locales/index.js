@@ -14,7 +14,11 @@ function detectLocale() {
   return 'en'
 }
 
-export const currentLang = writable(detectLocale())
+const initialLang = detectLocale()
+export const currentLang = writable(initialLang)
+if (typeof document !== 'undefined') {
+  document.documentElement.lang = initialLang
+}
 
 export const t = derived(currentLang, $lang => {
   const loc = locales[$lang] || en
@@ -30,6 +34,9 @@ export function setLang(lang) {
   if (!locales[lang]) return
   localStorage.setItem('entangled_locale', lang)
   currentLang.set(lang)
+  if (typeof document !== 'undefined') {
+    document.documentElement.lang = lang
+  }
 }
 
 export function fmt(str, vars) {

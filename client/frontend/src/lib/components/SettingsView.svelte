@@ -2,6 +2,7 @@
   import { onMount } from 'svelte'
   import { settings, addNotification } from '../stores/app.js'
   import { t, setLang, currentLang, fmt } from '../locales/index.js'
+  import ConfirmDialog from './ConfirmDialog.svelte'
 
   let cfg = { ...$settings }
   let version = '1.0.0'
@@ -10,6 +11,8 @@
   let updateStatus = '' // '', 'checking', 'latest', 'available', 'downloading', 'error'
   let updateLatest = ''
   let updateError = ''
+  let confirmRequest = null
+  let settingsSaveSerial = Promise.resolve()
 
   async function checkForUpdate() {
     updateBusy = true
@@ -33,8 +36,21 @@
     }
   }
 
-  async function applyUpdate() {
-    if (!confirm($t.confirm_update)) return
+  function requestConfirm(message, action, danger = false) {
+    confirmRequest = { message, action, danger }
+  }
+
+  function resolveConfirm() {
+    const action = confirmRequest?.action
+    confirmRequest = null
+    action?.()
+  }
+
+  function applyUpdate() {
+    requestConfirm($t.confirm_update, executeApplyUpdate, true)
+  }
+
+  async function executeApplyUpdate() {
     updateBusy = true
     updateStatus = 'downloading'
     updateError = ''
@@ -63,8 +79,11 @@
     }
   }
 
-  async function resetDefaults() {
-    if (!confirm($t.confirm_reset)) return
+  function resetDefaults() {
+    requestConfirm($t.confirm_reset, executeResetDefaults, true)
+  }
+
+  async function executeResetDefaults() {
     try {
       cfg = await window.go.main.App.ResetSettings()
       $settings = { ...cfg }
@@ -79,7 +98,27 @@
   function onScaleInput(e) {
     const n = Math.min(150, Math.max(75, Number(e.target.value) || 100))
     cfg.uiScale = n
-    $settings = { ...$settings, uiScale: n }
+  }
+
+  function onScaleChange() {
+    const n = Math.min(150, Math.max(75, Number(cfg.uiScale) || 100))
+    const previousScale = $settings.uiScale
+    const nextSettings = { ...$settings, uiScale: n }
+    $settings = nextSettings
+
+    settingsSaveSerial = settingsSaveSerial.then(async () => {
+      try {
+        await window.go.main.App.SaveSettings(nextSettings)
+      } catch (e) {
+        if ($settings.uiScale === n) {
+          $settings = { ...$settings, uiScale: previousScale }
+        }
+        if (cfg.uiScale === n) {
+          cfg = { ...cfg, uiScale: previousScale }
+        }
+        addNotification($t.error_save + e, 'error')
+      }
+    })
   }
 
   function handleLangChange(e) {
@@ -88,7 +127,23 @@
   }
 
   function onThemeChange() {
-    $settings = { ...$settings, theme: cfg.theme }
+    const previousTheme = $settings.theme
+    const nextSettings = { ...$settings, theme: cfg.theme }
+    $settings = nextSettings
+
+    settingsSaveSerial = settingsSaveSerial.then(async () => {
+      try {
+        await window.go.main.App.SaveSettings(nextSettings)
+      } catch (e) {
+        if ($settings.theme === nextSettings.theme) {
+          $settings = { ...$settings, theme: previousTheme }
+        }
+        if (cfg.theme === nextSettings.theme) {
+          cfg = { ...cfg, theme: previousTheme }
+        }
+        addNotification($t.error_save + e, 'error')
+      }
+    })
   }
 
   onMount(async () => {
@@ -114,16 +169,16 @@
     <p class="reconnect-banner" role="status">{$t.notif_reconnect_required}</p>
   {/if}
   <div class="section">
-    <div class="section-title">─── {$t.section_connection} ───</div>
+    <div class="section-title"><span>{$t.section_connection}</span></div>
 
     <div class="setting-row">
       <label class="setting-label" for="cfg-server">{$t.server_addr}</label>
-      <input id="cfg-server" type="text" bind:value={cfg.serverAddr} placeholder="vps.example.com:8080" />
+      <input id="cfg-server" type="text" bind:value={cfg.serverAddr} placeholder={$t.server_placeholder} />
     </div>
 
     <div class="setting-row">
       <label class="setting-label" for="cfg-nick">{$t.nickname}</label>
-      <input id="cfg-nick" type="text" bind:value={cfg.nickname} placeholder="Your nickname" />
+      <input id="cfg-nick" type="text" bind:value={cfg.nickname} placeholder={$t.nickname_placeholder} />
     </div>
 
     <div class="setting-row">
@@ -146,7 +201,7 @@
   </div>
 
   <div class="section">
-    <div class="section-title">─── {$t.section_network} ───</div>
+    <div class="section-title"><span>{$t.section_network}</span></div>
     <p class="hint">{$t.advanced_warn}</p>
 
     <div class="setting-row">
@@ -166,7 +221,7 @@
 
     <div class="setting-row">
       <label class="setting-label" for="cfg-dns">{$t.dns_server}</label>
-      <input id="cfg-dns" type="text" bind:value={cfg.dnsServer} placeholder="system default" />
+      <input id="cfg-dns" type="text" bind:value={cfg.dnsServer} placeholder={$t.system_default} />
     </div>
     <p class="hint">{$t.dns_desc}</p>
 
@@ -178,13 +233,13 @@
 
     <div class="setting-row">
       <label class="setting-label" for="cfg-stun">{$t.stun_server}</label>
-      <input id="cfg-stun" type="text" bind:value={cfg.stunServer} placeholder="stun.l.google.com:19302" />
+      <input id="cfg-stun" type="text" bind:value={cfg.stunServer} placeholder={$t.stun_placeholder} />
     </div>
     <p class="hint reconnect-hint">{$t.stun_desc}</p>
   </div>
 
   <div class="section">
-    <div class="section-title">─── {$t.section_system} ───</div>
+    <div class="section-title"><span>{$t.section_system}</span></div>
 
     <label class="setting-row toggle-row">
       <span class="setting-label">{$t.start_windows}</span>
@@ -216,7 +271,7 @@
   </div>
 
   <div class="section">
-    <div class="section-title">─── {$t.section_appearance} ───</div>
+    <div class="section-title"><span>{$t.section_appearance}</span></div>
 
     <div class="setting-row scale-row">
       <label class="setting-label" for="cfg-scale">{$t.ui_scale}</label>
@@ -228,6 +283,7 @@
         step="5"
         value={cfg.uiScale ?? 100}
         on:input={onScaleInput}
+        on:change={onScaleChange}
       />
       <span class="scale-value">{cfg.uiScale ?? 100}%</span>
     </div>
@@ -271,20 +327,23 @@
     flex-direction: column;
     height: 100%;
     padding: 24px 32px;
+    min-width: 0;
   }
   .settings-content {
     flex: 1;
     overflow-y: auto;
     min-height: 0;
     height: 0;
+    width: min(680px, 100%);
   }
   .settings-title {
-    font-size: var(--font-size);
+    font-size: calc(var(--font-size) * 1.35);
     color: var(--text-bright);
     text-transform: uppercase;
     letter-spacing: 1px;
     font-weight: 500;
     margin-bottom: 20px;
+    line-height: 1.2;
   }
   .reconnect-banner {
     background: var(--bg-raised);
@@ -296,9 +355,22 @@
   }
   .section { margin-bottom: 24px; }
   .section-title {
+    display: flex;
+    align-items: center;
     font-size: var(--font-size-xs);
     color: var(--text-muted);
     letter-spacing: 1px;
+    gap: 12px;
+    margin-bottom: 14px;
+  }
+  .section-title::after {
+    content: '';
+    height: 1px;
+    flex: 1;
+    background: var(--border);
+  }
+  .section-title span {
+    flex-shrink: 0;
   }
   .hint {
     font-size: var(--font-size-xs);
@@ -336,6 +408,10 @@
   input[type="checkbox"] {
     width: 18px;
     height: 18px;
+    accent-color: var(--accent);
+  }
+  input[type="radio"] {
+    accent-color: var(--accent);
   }
   .radio-group { display: flex; gap: 12px; }
   .radio-option {
@@ -376,4 +452,39 @@
   }
   .btn-check:disabled, .btn-update:disabled { opacity: 0.5; cursor: default; }
   .ver { margin-left: auto; color: var(--text-dim); font-size: var(--font-size-xs); }
+  @media (max-width: 640px) {
+    .settings-view { padding: 18px 16px; }
+    .setting-row {
+      align-items: stretch;
+      flex-wrap: wrap;
+      gap: 6px 10px;
+    }
+    .setting-label {
+      min-width: 100%;
+    }
+    .setting-row input[type="text"],
+    .setting-row input[type="password"],
+    .setting-row input[type="number"],
+    .setting-row select {
+      min-width: 0;
+      width: 100%;
+    }
+    .toggle-row {
+      align-items: center;
+      flex-wrap: nowrap;
+    }
+    .toggle-row .setting-label { min-width: 0; }
+    .actions-section { flex-wrap: wrap; }
+    .ver { width: 100%; margin-left: 0; }
+  }
 </style>
+
+{#if confirmRequest}
+  <ConfirmDialog
+    open={true}
+    message={confirmRequest.message}
+    danger={confirmRequest.danger}
+    on:cancel={() => (confirmRequest = null)}
+    on:confirm={resolveConfirm}
+  />
+{/if}

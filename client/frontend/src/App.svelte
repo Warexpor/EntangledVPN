@@ -1,6 +1,6 @@
 <script>
   import { onMount, onDestroy } from 'svelte'
-  import { status, peers, view, settings, notifications, durableError, clearDurableError, addNotification, addChatMessage, addSystemChat } from './lib/stores/app.js'
+  import { status, peers, view, settings, notifications, durableError, clearDurableError, pendingJoin, addNotification, removeNotification, addChatMessage, addSystemChat } from './lib/stores/app.js'
   import { currentLang, setLang, t, fmt } from './lib/locales/index.js'
   import Sidebar from './lib/components/Sidebar.svelte'
   import PeerList from './lib/components/PeerList.svelte'
@@ -16,7 +16,7 @@
 
   $: {
     const scale = clampScale($settings.uiScale) / 100
-    document.documentElement.style.zoom = String(scale)
+    document.documentElement.style.setProperty('--ui-scale', String(scale))
   }
 
   $: {
@@ -51,6 +51,16 @@
     isDragging = false
     document.removeEventListener('mousemove', onDragMove)
     document.removeEventListener('mouseup', onDragEnd)
+    localStorage.setItem('entangled_sidebar_width', String(sidebarWidth))
+  }
+
+  function onDragKeydown(e) {
+    if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
+      e.preventDefault()
+      const delta = e.key === 'ArrowRight' ? 16 : -16
+      sidebarWidth = Math.max(180, Math.min(400, sidebarWidth + delta))
+      localStorage.setItem('entangled_sidebar_width', String(sidebarWidth))
+    }
   }
 
   async function onKeyDown(e) {
@@ -65,11 +75,21 @@
 
   onMount(async () => {
     window.addEventListener('keydown', onKeyDown)
+    const storedSidebarWidth = Number(localStorage.getItem('entangled_sidebar_width'))
+    if (storedSidebarWidth) sidebarWidth = Math.max(180, Math.min(400, storedSidebarWidth))
     try {
       const saved = await window.go.main.App.LoadConfig()
       if (saved) {
         settings.set({ ...$settings, ...saved })
         if (saved.lang) setLang(saved.lang)
+      }
+    } catch (_) {}
+
+    try {
+      if (window.go?.main?.App?.GetStatus) {
+        const initialStatus = await window.go.main.App.GetStatus()
+        status.set(initialStatus)
+        if (initialStatus?.connected) view.set('network')
       }
     } catch (_) {}
 
@@ -105,6 +125,7 @@
       window.runtime.EventsOn("auto_join_skipped", (data) => {
         if (!mounted) return
         const room = data?.room || ''
+        pendingJoin.set(room)
         addNotification(fmt($t.notif_auto_join_skipped, { name: room }), 'info')
       })
     }
@@ -141,26 +162,43 @@
     <div class="layout">
       <div class="sidebar-wrapper" style="width: {sidebarWidth}px">
         <Sidebar />
-        <!-- svelte-ignore a11y-no-static-element-interactions -->
-        <div
+        <button
+          type="button"
           class="drag-handle"
           class:active={isDragging}
+          role="slider"
+          aria-orientation="vertical"
+          aria-label={$t.resize_sidebar}
+          aria-valuemin="180"
+          aria-valuemax="400"
+          aria-valuenow={sidebarWidth}
+          tabindex="0"
           on:mousedown={onDragStart}
-        ></div>
+          on:keydown={onDragKeydown}
+        ></button>
       </div>
 
       <main class="main-area">
-        <div class="view-fade" key={$view}>
-          {#if $view === 'network'}
-            <PeerList />
-          {:else if $view === 'chat'}
-            <ChatView />
-          {:else if $view === 'settings'}
-            <SettingsView />
-          {:else}
-            <div class="unknown-view">Unknown view: {$view}</div>
-          {/if}
-        </div>
+        {#if $status.reconnecting}
+          <div class="reconnect-banner" role="status">
+            <span class="sq sq-warn" aria-hidden="true"></span>
+            <span>{$t.reconnecting}</span>
+            <span class="reconnect-detail">{$t.reconnect_in_progress}</span>
+          </div>
+        {/if}
+        {#key $view}
+          <div class="view-fade">
+            {#if $view === 'network'}
+              <PeerList />
+            {:else if $view === 'chat'}
+              <ChatView />
+            {:else if $view === 'settings'}
+              <SettingsView />
+            {:else}
+              <div class="unknown-view">Unknown view: {$view}</div>
+            {/if}
+          </div>
+        {/key}
       </main>
     </div>
 
@@ -177,12 +215,19 @@
   </div>
 {/if}
 
-{#each $notifications as notif (notif.id)}
-  <div class="notification {notif.type}" role="status">
-    <span class="notif-icon">{notif.type === 'error' ? '!' : '>'}</span>
-    {notif.msg}
+{#if $notifications.length}
+  <div class="notification-stack" aria-live="polite">
+    {#each $notifications as notif (notif.id)}
+      <div class="notification {notif.type}" role={notif.type === 'error' ? 'alert' : 'status'}>
+        <span class="notif-icon" aria-hidden="true">{notif.type === 'error' ? '!' : '>'}</span>
+        <span class="notification-message">{notif.msg}</span>
+        <button type="button" class="notification-dismiss" on:click={() => removeNotification(notif.id)} aria-label={$t.dismiss}>
+          ×
+        </button>
+      </div>
+    {/each}
   </div>
-{/each}
+{/if}
 
 <style>
   .shell {
@@ -214,6 +259,7 @@
   .sidebar-wrapper {
     position: relative;
     flex-shrink: 0;
+    max-width: 38vw;
     background: var(--bg-surface);
     border-right: 1px solid var(--border);
     display: flex;
@@ -227,7 +273,7 @@
     width: 6px;
     height: 100%;
     cursor: col-resize;
-    z-index: 10;
+    z-index: var(--z-drag);
     background: transparent;
     transition: background 0.1s;
   }
@@ -264,7 +310,7 @@
     left: 12px;
     right: 12px;
     bottom: calc(var(--statusbar-height) + 12px);
-    z-index: 1100;
+    z-index: var(--z-alert);
     display: flex;
     align-items: center;
     gap: 12px;
@@ -273,6 +319,7 @@
     border: 1px solid var(--error);
     color: var(--error);
     font-size: var(--font-size-sm);
+    animation: slideUp 0.18s ease-out;
   }
   .error-strip-msg {
     flex: 1;
@@ -292,19 +339,32 @@
     text-transform: uppercase;
   }
   .error-strip-dismiss:hover {
-    background: rgba(196, 92, 92, 0.12);
+    background: var(--error-surface);
   }
-  .notification {
+  .notification-stack {
     position: fixed;
     top: 12px;
     right: 12px;
-    padding: 6px 12px;
+    z-index: var(--z-toast);
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 8px;
+    width: min(360px, calc(100vw - 24px));
+    pointer-events: none;
+  }
+  .notification {
+    width: 100%;
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    padding: 8px 10px;
     font-size: var(--font-size-sm);
-    z-index: 1000;
     background: var(--bg-raised);
     border: 1px solid var(--border);
     color: var(--text-primary);
     animation: slideIn 0.15s ease-out;
+    pointer-events: auto;
   }
   .notification.error {
     border-color: var(--error);
@@ -314,11 +374,58 @@
     border-color: var(--border);
   }
   .notif-icon {
-    margin-right: 6px;
     font-weight: 700;
+    flex-shrink: 0;
+  }
+  .notification-message {
+    flex: 1;
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+  .notification-dismiss {
+    color: var(--text-muted);
+    font-size: 16px;
+    line-height: 1;
+    padding: 0 2px;
+    min-width: 24px;
+    min-height: 24px;
+  }
+  .notification-dismiss:hover {
+    color: var(--text-bright);
   }
   @keyframes slideIn {
     from { transform: translateX(100%); opacity: 0; }
     to { transform: translateX(0); opacity: 1; }
+  }
+  @keyframes slideUp {
+    from { opacity: 0; transform: translateY(6px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  .reconnect-banner {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 16px;
+    border-bottom: 1px solid var(--warning);
+    background: var(--warning-surface);
+    color: var(--warning);
+    font-size: var(--font-size-sm);
+  }
+  .reconnect-detail {
+    color: var(--text-secondary);
+  }
+  .sq {
+    width: 8px;
+    height: 8px;
+    display: inline-block;
+    flex-shrink: 0;
+  }
+  .sq-warn { background: var(--warning); }
+  @media (max-width: 640px) {
+    .reconnect-detail { display: none; }
+    .error-strip { left: 8px; right: 8px; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .view-fade, .notification, .error-strip { animation: none; }
   }
 </style>

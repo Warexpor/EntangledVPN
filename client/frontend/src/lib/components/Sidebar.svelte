@@ -1,7 +1,8 @@
 <script>
-  import { onMount, onDestroy } from 'svelte'
-  import { status, view, addNotification, peers, clearDurableError } from '../stores/app.js'
+  import { onMount, onDestroy, tick } from 'svelte'
+  import { status, view, addNotification, peers, pendingJoin, clearDurableError } from '../stores/app.js'
   import { t, fmt } from '../locales/index.js'
+  import ConfirmDialog from './ConfirmDialog.svelte'
 
   let savedRooms = []
   let showCreate = false
@@ -21,6 +22,17 @@
   let menuOpen = null
   let createDialog
   let joinDialog
+  let confirmRequest = null
+
+  $: if ($pendingJoin) {
+    joinName = $pendingJoin
+    joinPass = ''
+    joinError = ''
+    joinNameErr = ''
+    pendingJoin.set('')
+    showJoin = true
+    tick().then(() => document.getElementById('join-pass')?.focus())
+  }
 
   onMount(async () => {
     savedRooms = await window.go.main.App.GetSavedRooms()
@@ -57,6 +69,7 @@
     createNameErr = ''
     showCreate = true
     clearDurableError()
+    tick().then(() => document.getElementById('create-name')?.focus())
   }
 
   function closeCreate() {
@@ -70,6 +83,7 @@
     joinNameErr = ''
     showJoin = true
     clearDurableError()
+    tick().then(() => document.getElementById('join-name')?.focus())
   }
 
   function closeJoin() {
@@ -127,8 +141,21 @@
     }
   }
 
-  async function leaveRoom() {
-    if (!confirm($t.confirm_leave)) return
+  function requestConfirm(message, action, danger = false) {
+    confirmRequest = { message, action, danger }
+  }
+
+  function resolveConfirm() {
+    const action = confirmRequest?.action
+    confirmRequest = null
+    action?.()
+  }
+
+  function leaveRoom() {
+    requestConfirm($t.confirm_leave, executeLeaveRoom)
+  }
+
+  async function executeLeaveRoom() {
     try {
       await window.go.main.App.LeaveRoom()
       addNotification($t.notif_left)
@@ -138,13 +165,17 @@
     }
   }
 
-  async function removeSaved(name) {
+  function removeSaved(name) {
     const active = $status.room === name
     if (active) {
-      if (!confirm($t.confirm_leave_remove)) return
-    } else if (!confirm(fmt($t.confirm_remove, { name }))) {
-      return
+      requestConfirm($t.confirm_leave_remove, () => removeSavedNow(name), true)
+    } else {
+      requestConfirm(fmt($t.confirm_remove, { name }), () => removeSavedNow(name))
     }
+  }
+
+  async function removeSavedNow(name) {
+    const active = $status.room === name
     try {
       if (active) await window.go.main.App.LeaveRoom()
       await window.go.main.App.RemoveSavedRoom(name)
@@ -155,8 +186,11 @@
     }
   }
 
-  async function deleteNetwork(name) {
-    if (!confirm(fmt($t.confirm_delete, { name }))) return
+  function deleteNetwork(name) {
+    requestConfirm(fmt($t.confirm_delete, { name }), () => deleteNetworkNow(name), true)
+  }
+
+  async function deleteNetworkNow(name) {
     try {
       await window.go.main.App.DeleteRoom(name)
       await window.go.main.App.RemoveSavedRoom(name)
@@ -193,6 +227,17 @@
 
   async function switchRoom(name, password, server) {
     if (joining) return
+    const room = savedRooms.find(item => item.name === name)
+    if (room?.locked && !password) {
+      joinName = name
+      joinPass = ''
+      joinError = ''
+      joinNameErr = ''
+      showJoin = true
+      await tick()
+      document.getElementById('join-pass')?.focus()
+      return
+    }
     joining = name
     menuOpen = null
     try {
@@ -240,6 +285,27 @@
     menuOpen = null
     fn()
   }
+
+  function onModalKeydown(e, action, dialog) {
+    if (e.key === 'Enter') {
+      e.preventDefault()
+      action()
+      return
+    }
+    if (e.key === 'Tab' && dialog) {
+      const focusable = [...dialog.querySelectorAll('input, button:not(:disabled)')]
+      if (!focusable.length) return
+      const first = focusable[0]
+      const last = focusable[focusable.length - 1]
+      if (e.shiftKey && document.activeElement === first) {
+        e.preventDefault()
+        last.focus()
+      } else if (!e.shiftKey && document.activeElement === last) {
+        e.preventDefault()
+        first.focus()
+      }
+    }
+  }
 </script>
 
 <aside class="sidebar" aria-label={$t.networks}>
@@ -268,13 +334,16 @@
         role="button"
         tabindex="0"
         aria-current={$status.room === room.name ? 'true' : undefined}
-        aria-label={room.name}
+        aria-label={room.locked ? `${room.name} — ${$t.locked}` : room.name}
         on:click={() => switchRoom(room.name, room.password, room.server)}
         on:keydown={(e) => onRowKey(e, room)}
       >
         <div class="network-indicator" class:active-dot={$status.room === room.name} aria-hidden="true"></div>
         <div class="network-info">
-          <div class="network-name">{room.name}</div>
+          <div class="network-name">
+            <span class="network-name-text">{room.name}</span>
+            {#if room.locked}<span class="locked-label">{$t.locked}</span>{/if}
+          </div>
           <div class="network-meta">
             {#if joining === room.name}
               {$t.connecting}
@@ -355,7 +424,7 @@
         aria-labelledby="create-title"
         bind:this={createDialog}
         on:click|stopPropagation
-        on:keydown|stopPropagation
+        on:keydown={(e) => onModalKeydown(e, createRoom, createDialog)}
       >
         <h3 id="create-title">{$t.create_network}</h3>
         <label class="sr-only" for="create-name">{$t.network_name}</label>
@@ -398,7 +467,7 @@
         aria-labelledby="join-title"
         bind:this={joinDialog}
         on:click|stopPropagation
-        on:keydown|stopPropagation
+        on:keydown={(e) => onModalKeydown(e, () => joinRoom(), joinDialog)}
       >
         <h3 id="join-title">{$t.join_network}</h3>
         <label class="sr-only" for="join-name">{$t.network_name}</label>
@@ -503,11 +572,25 @@
     min-width: 0;
   }
   .network-name {
+    display: flex;
+    align-items: baseline;
+    gap: 4px;
     font-size: var(--font-size);
     color: var(--text-bright);
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
+  }
+  .network-name-text {
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .locked-label {
+    flex-shrink: 0;
+    margin-left: 6px;
+    color: var(--warning);
+    font-size: var(--font-size-xs);
+    letter-spacing: 0.06em;
   }
   .network-meta {
     font-size: var(--font-size-xs);
@@ -541,7 +624,7 @@
     position: absolute;
     right: 0;
     top: 100%;
-    z-index: 20;
+    z-index: var(--z-menu);
     min-width: 160px;
     background: var(--bg-raised);
     border: 1px solid var(--border);
@@ -562,7 +645,7 @@
   }
   .menu-item:hover { background: var(--bg-hover); color: var(--text-bright); }
   .menu-item.danger { color: var(--error); }
-  .menu-item.danger:hover { background: rgba(196, 92, 92, 0.12); }
+  .menu-item.danger:hover { background: var(--error-surface); }
   .empty-desc {
     margin-top: 6px;
     font-size: var(--font-size-xs);
@@ -589,7 +672,7 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    z-index: 100;
+    z-index: var(--z-modal);
     animation: fadeIn 0.12s ease-out;
   }
   @keyframes fadeIn {
@@ -633,7 +716,7 @@
   .modal-error {
     padding: 8px;
     border: 1px solid var(--error);
-    background: rgba(196, 92, 92, 0.08);
+    background: var(--error-surface);
   }
   .modal-actions {
     display: flex;
@@ -652,3 +735,13 @@
     border: 0;
   }
 </style>
+
+{#if confirmRequest}
+  <ConfirmDialog
+    open={true}
+    message={confirmRequest.message}
+    danger={confirmRequest.danger}
+    on:cancel={() => (confirmRequest = null)}
+    on:confirm={resolveConfirm}
+  />
+{/if}

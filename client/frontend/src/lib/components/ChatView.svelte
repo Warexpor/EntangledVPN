@@ -10,11 +10,12 @@
   let chatContainer
   let textareaEl
   let isNearBottom = true
+  let lastReadKey = ''
 
-  $: {
-    if ($view === 'chat') {
-      markThreadRead(activeThreadKey())
-    }
+  $: currentThreadKey = activeThreadKey()
+  $: if ($view === 'chat' && currentThreadKey !== lastReadKey) {
+    lastReadKey = currentThreadKey
+    markThreadRead(currentThreadKey)
   }
 
   afterUpdate(() => {
@@ -49,6 +50,7 @@
       addNotification($t.msg_truncated, 'info')
     }
 
+    const threadKey = activeThreadKey()
     inputText = ''
     if (textareaEl) textareaEl.style.height = 'auto'
 
@@ -61,24 +63,25 @@
       } else {
         await window.go.main.App.BroadcastChat(payload)
       }
-      updateMessageStatus(localId, 'sent')
+      updateMessageStatus(localId, 'sent', threadKey)
     } catch (e) {
-      updateMessageStatus(localId, 'failed')
+      updateMessageStatus(localId, 'failed', threadKey)
       addNotification(fmt($t.error_send, { err: e }), 'error')
     }
   }
 
   async function retryMessage(msg) {
-    updateMessageStatus(msg.id, 'pending')
+    const threadKey = msg.threadKey || activeThreadKey()
+    updateMessageStatus(msg.id, 'pending', threadKey)
     try {
-      if ($chatTarget && $chatTarget.id) {
-        await window.go.main.App.SendChat($chatTarget.id, msg.message)
+      if (msg.threadKey?.startsWith('peer:')) {
+        await window.go.main.App.SendChat(msg.threadKey.slice(5), msg.message)
       } else {
         await window.go.main.App.BroadcastChat(msg.message)
       }
-      updateMessageStatus(msg.id, 'sent')
+      updateMessageStatus(msg.id, 'sent', threadKey)
     } catch (e) {
-      updateMessageStatus(msg.id, 'failed')
+      updateMessageStatus(msg.id, 'failed', threadKey)
       addNotification(fmt($t.error_send, { err: e }), 'error')
     }
   }
@@ -128,11 +131,11 @@
 
 <div class="chat-view">
   <div class="chat-header">
-    <button class="back-btn" on:click={closeChat} title={$t.back}>&lt;</button>
+    <button class="back-btn" on:click={closeChat} title={$t.back} aria-label={$t.back}>&lt;</button>
     <span class="chat-title">{title}</span>
   </div>
 
-  <div class="chat-messages" bind:this={chatContainer} on:scroll={onScroll}>
+  <div class="chat-messages" role="log" aria-live="polite" aria-label={$t.chat} bind:this={chatContainer} on:scroll={onScroll}>
     {#if $chatMessages.length === 0}
       <div class="empty-chat">
         <div class="empty-chat-icon">[ . . . ]</div>
@@ -152,10 +155,10 @@
             <span class="msg-nick">{msg.isSelf ? ($settings.nickname || $t.you_self) : msg.nickname}</span>
             {#if msg.status === 'pending'}<span class="msg-status">…</span>{/if}
             {#if msg.status === 'failed'}
-              <button class="retry-btn" on:click={() => retryMessage(msg)}>{$t.retry}</button>
+              <button class="retry-btn" on:click={() => retryMessage(msg)} aria-label={$t.retry}>{$t.retry}</button>
             {/if}
           </div>
-          <div class="msg-body">{msg.message}</div>
+          <div class="msg-body" title={new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}>{msg.message}</div>
         </div>
       {/if}
     {/each}
@@ -252,6 +255,8 @@
   }
   .msg.self .msg-body {
     background: var(--bg-active);
+    border-color: var(--accent);
+    color: var(--text-bright);
   }
   .retry-btn {
     margin-left: 6px;
@@ -288,6 +293,7 @@
     cursor: pointer;
     font-family: var(--font-mono);
     text-transform: uppercase;
+    letter-spacing: 0.08em;
   }
   .send-btn:disabled { opacity: 0.4; cursor: not-allowed; }
 </style>
