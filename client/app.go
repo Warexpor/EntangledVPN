@@ -473,6 +473,7 @@ func (a *App) Connect(serverAddr, nickname string) (AppStatus, error) {
 			a.vpn = nil
 		}
 		a.mu.Unlock()
+		newVPN.Stop()
 		return AppStatus{}, err
 	}
 
