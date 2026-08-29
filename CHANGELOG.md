@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+## 1.3.2 - 2026-08-29
+
+### Fixed
+
+- Windows build now ships the real EV icon and requireAdministrator manifest. These lived only in gitignored `client/build/` and were lost on `wails build -clean`, so the in-app updater could not pick up a replaced 1.3.1 exe.
+
 ## 1.3.1 — 2026-08-29
 
 ### Fixed
