@@ -167,6 +167,7 @@ func (v *VPNCore) Start() error {
 		v.status.Phase = "error"
 		v.mu.Unlock()
 		v.updateStatus()
+		v.Stop()
 		return err
 	case <-time.After(15 * time.Second):
 		v.mu.Lock()
@@ -176,6 +177,7 @@ func (v *VPNCore) Start() error {
 		v.status.Phase = "error"
 		v.mu.Unlock()
 		v.updateStatus()
+		v.Stop()
 		return fmt.Errorf("authentication timed out")
 	}
 
@@ -547,12 +549,14 @@ func (v *VPNCore) reconnectLoop(gen int, room, pass string) {
 				v.mu.Lock()
 				v.authErr = nil
 				v.mu.Unlock()
+				v.closeSignalingAttempt()
 				continue
 			case <-time.After(15 * time.Second):
 				v.log("Reconnect auth timeout")
 				v.mu.Lock()
 				v.authErr = nil
 				v.mu.Unlock()
+				v.closeSignalingAttempt()
 				continue
 			}
 		}
@@ -629,6 +633,18 @@ func (v *VPNCore) cleanupAfterDisconnect() {
 	v.updatePeers()
 }
 
+// closeSignalingAttempt closes the WebSocket from a failed Start/reconnect
+// try without marking the core as stopping (reconnectLoop must keep retrying).
+func (v *VPNCore) closeSignalingAttempt() {
+	v.mu.Lock()
+	sig := v.signaling
+	v.signaling = nil
+	v.mu.Unlock()
+	if sig != nil {
+		sig.Close()
+	}
+}
+
 func (v *VPNCore) Stop() {
 	v.mu.Lock()
 	v.stopping = true
@@ -637,6 +653,7 @@ func (v *VPNCore) Stop() {
 		v.relay.Stop()
 	}
 	sig := v.signaling
+	v.signaling = nil
 	if v.listenerConn != nil {
 		v.listenerConn.Close()
 		v.listenerConn = nil
