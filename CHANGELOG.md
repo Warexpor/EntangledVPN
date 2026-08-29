@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+## 1.3.1 — 2026-08-29
+
+### Fixed
+
+- Failed or timed-out signaling auth left a live WebSocket; Connect niled `a.vpn` without `Stop()`, so retries stacked zombie sessions; `reconnectLoop` leaked the same way. `Start`/`Connect`/`reconnectLoop` now close that attempt
+
 ## 1.3.0 — 2026-08-28
 
 ### Added
