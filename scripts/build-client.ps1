@@ -30,6 +30,14 @@ Write-Host "`nInstalling frontend dependencies..." -ForegroundColor Cyan
 npm install
 Pop-Location
 
+# Restore tracked packaging (icon + requireAdministrator). client/build/ is gitignored.
+New-Item -ItemType Directory -Force -Path "client\build\windows" | Out-Null
+if (Test-Path "client\packaging\appicon.png") {
+    Copy-Item "client\packaging\appicon.png" "client\build\appicon.png" -Force
+}
+if (Test-Path "client\packaging\windows") {
+    Copy-Item "client\packaging\windows\*" "client\build\windows\" -Force
+}
 # Download Wintun DLL
 $wintunDir = "$env:TEMP\wintun"
 if (-not (Test-Path "$wintunDir\wintun\bin\amd64\wintun.dll")) {
@@ -55,7 +63,7 @@ Pop-Location
 # Build
 Push-Location client
 Write-Host "`nBuilding client..." -ForegroundColor Cyan
-wails build -clean -o "Entangled.exe"
+wails build -o "Entangled.exe"
 Pop-Location
 
 # Copy wintun.dll next to the binary
