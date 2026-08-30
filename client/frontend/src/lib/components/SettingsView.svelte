@@ -126,6 +126,14 @@
     setLang(e.target.value)
   }
 
+  async function openLogFolder() {
+    try {
+      await window.go.main.App.OpenLogFolder()
+    } catch (e) {
+      addNotification($t.error_open_logs + e, 'error')
+    }
+  }
+
   function onThemeChange() {
     const previousTheme = $settings.theme
     const nextSettings = { ...$settings, theme: cfg.theme }
@@ -245,6 +253,14 @@
       <span class="setting-label">{$t.start_windows}</span>
       <input type="checkbox" bind:checked={cfg.startWithWindows} />
     </label>
+
+    <div class="setting-row update-row">
+      <span class="setting-label">{$t.logs}</span>
+      <button class="btn btn-check" type="button" on:click={openLogFolder}>
+        {$t.open_logs}
+      </button>
+    </div>
+    <p class="hint">{$t.logs_desc}</p>
 
     <div class="setting-row update-row">
       <span class="setting-label">{$t.updates}</span>

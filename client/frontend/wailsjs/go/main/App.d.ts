@@ -36,6 +36,8 @@ export function LeaveRoom():Promise<void>;
 
 export function LoadConfig():Promise<main.ClientConfig>;
 
+export function OpenLogFolder():Promise<void>;
+
 export function ParseInvite(arg1:string):Promise<Record<string, string>>;
 
 export function PingPeer(arg1:string):Promise<void>;

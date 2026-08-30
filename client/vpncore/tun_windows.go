@@ -262,14 +262,22 @@ func (t *TUNAdapter) applyMTU() {
 // SetDNS configures a static DNS server for the TUN adapter.
 func (t *TUNAdapter) SetDNS(dnsServer string) {
 	t.dnsServer = dnsServer
-	if dnsServer == "" {
-		t.applySystemDNS()
-		return
-	}
 	t.applyDNS()
 }
 
 func (t *TUNAdapter) applyDNS() {
+	if t.dnsServer == "" {
+		cmd := HiddenCommand("netsh", "interface", "ip", "set", "dns",
+			fmt.Sprintf("name=%s", WINTUN_NAME),
+			"source=dhcp",
+		)
+		if out, err := cmd.CombinedOutput(); err != nil {
+			t.logf("Warning: failed to clear DNS: %v, output: %s", err, strings.TrimSpace(string(out)))
+		} else {
+			t.logf("DNS cleared (DHCP)")
+		}
+		return
+	}
 	cmd := HiddenCommand("netsh", "interface", "ip", "set", "dns",
 		fmt.Sprintf("name=%s", WINTUN_NAME),
 		"source=static",
@@ -280,18 +288,6 @@ func (t *TUNAdapter) applyDNS() {
 		t.logf("Warning: failed to set DNS to %s: %v, output: %s", t.dnsServer, err, strings.TrimSpace(string(out)))
 	} else {
 		t.logf("DNS set to %s", t.dnsServer)
-	}
-}
-
-func (t *TUNAdapter) applySystemDNS() {
-	cmd := HiddenCommand("netsh", "interface", "ip", "set", "dns",
-		fmt.Sprintf("name=%s", WINTUN_NAME),
-		"source=dhcp",
-	)
-	if out, err := cmd.CombinedOutput(); err != nil {
-		t.logf("Warning: failed to restore system DNS: %v, output: %s", err, strings.TrimSpace(string(out)))
-	} else {
-		t.logf("DNS restored to system default")
 	}
 }
 

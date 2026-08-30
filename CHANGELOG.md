@@ -2,17 +2,25 @@
 
 ## Unreleased
 
-## 1.3.2 - 2026-08-29
+## 1.3.1 — 2026-08-30
+
+This replaces the withdrawn 1.3.1 / 1.3.2 GitHub releases.
+
+### Added
+
+- Settings: **Open log folder** (`%APPDATA%\EntangledVPN`); Explorer is opened without the hidden-window flag
+- Tracked Windows packaging (EV icon + requireAdministrator) so `wails build` keeps them
+
+### Changed
+
+- P2P/signaling/relay path is the 1.2.8 netcode again (last known-good). Current UI and Settings stay.
+- Peer table, status bar, and sidebar alignment
 
 ### Fixed
 
-- Windows build now ships the real EV icon and requireAdministrator manifest. These lived only in gitignored `client/build/` and were lost on `wails build -clean`, so the in-app updater could not pick up a replaced 1.3.1 exe.
-
-## 1.3.1 — 2026-08-29
-
-### Fixed
-
-- Failed or timed-out signaling auth left a live WebSocket; Connect niled `a.vpn` without `Stop()`, so retries stacked zombie sessions; `reconnectLoop` leaked the same way. `Start`/`Connect`/`reconnectLoop` now close that attempt
+- Failed Connect now `Stop()`s that VPN core so retries do not leave a live WebSocket
+- Clearing TUN DNS uses DHCP instead of a blank static address
+- Create/Join/Delete report an error when signaling is down
 
 ## 1.3.0 — 2026-08-28
 

@@ -70,6 +70,10 @@ export function LoadConfig() {
   return window['go']['main']['App']['LoadConfig']();
 }
 
+export function OpenLogFolder() {
+  return window['go']['main']['App']['OpenLogFolder']();
+}
+
 export function ParseInvite(arg1) {
   return window['go']['main']['App']['ParseInvite'](arg1);
 }

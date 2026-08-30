@@ -81,15 +81,17 @@
 
 <style>
   .statusbar {
+    height: var(--statusbar-height);
     min-height: var(--statusbar-height);
     background: var(--bg-deep);
     border-top: 1px solid var(--border);
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: 12px;
-    padding: 4px 12px;
+    gap: 16px;
+    padding: 0 14px;
     font-size: var(--font-size-xs);
+    line-height: 1;
     color: var(--text-secondary);
     flex-shrink: 0;
     font-family: var(--font-mono);
@@ -102,9 +104,10 @@
   .status-right {
     display: flex;
     align-items: center;
-    gap: 8px 14px;
+    gap: 12px;
     min-width: 0;
     flex-wrap: nowrap;
+    height: 100%;
   }
   .status-left {
     flex: 0 1 auto;
@@ -115,24 +118,32 @@
     opacity: 0.85;
   }
   .status-item {
+    display: inline-flex;
+    align-items: center;
+    height: 100%;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
     max-width: 36ch;
+    line-height: 1;
   }
   .status-server { max-width: 28ch; }
   .status-room { max-width: 22ch; }
-  .status-ver { flex-shrink: 0; max-width: none; }
+  .status-ver { flex-shrink: 0; max-width: none; margin-left: 4px; }
   .disconnect-btn {
     flex-shrink: 0;
-    min-height: 24px;
-    padding: 2px 8px;
+    height: 22px;
+    padding: 0 10px;
+    margin-right: 4px;
+    display: inline-flex;
+    align-items: center;
     border: 1px solid var(--error);
     color: var(--error);
     font-family: var(--font-mono);
     font-size: var(--font-size-xs);
     text-transform: uppercase;
     letter-spacing: 0.05em;
+    line-height: 1;
   }
   .disconnect-btn:hover:not(:disabled) {
     background: rgba(226, 61, 61, 0.1);
@@ -143,7 +154,6 @@
     width: 7px;
     height: 7px;
     background: var(--error);
-    vertical-align: middle;
     flex-shrink: 0;
   }
   .sq.sq-connected { background: var(--success); }

@@ -37,9 +37,6 @@ type VPNCore struct {
 	stopping       bool
 	reconnectGen   int
 	authOK         chan struct{}
-	authErr        chan error
-	roomResult     chan error
-	roomResultName string
 	lastRoomName   string
 	lastRoomPass   string
 	lastIsOwner    bool
@@ -120,7 +117,9 @@ func (v *VPNCore) ApplyTUNSettings(mtu int, dnsServer string) {
 	if mtu > 0 {
 		tun.SetMTU(mtu)
 	}
-	tun.SetDNS(dnsServer)
+	if dnsServer != "" {
+		tun.SetDNS(dnsServer)
+	}
 }
 
 func (v *VPNCore) Start() error {
@@ -142,45 +141,17 @@ func (v *VPNCore) Start() error {
 		v.status.Phase = "error"
 		v.mu.Unlock()
 		v.updateStatus()
+		v.Stop()
 		return err
 	}
 
 	v.mu.Lock()
-	authOK := v.authOK
-	authErr := v.authErr
+	v.status.Connected = true
+	v.status.Reconnecting = false
+	v.status.Server = v.config.ServerAddr
+	v.status.Phase = "ready"
 	v.mu.Unlock()
-	select {
-	case <-authOK:
-		v.mu.Lock()
-		v.authErr = nil
-		v.status.Connected = true
-		v.status.Reconnecting = false
-		v.status.Server = v.config.ServerAddr
-		v.status.Phase = "ready"
-		v.mu.Unlock()
-		v.updateStatus()
-	case err := <-authErr:
-		v.mu.Lock()
-		v.authErr = nil
-		v.status.Connected = false
-		v.status.Reconnecting = false
-		v.status.Phase = "error"
-		v.mu.Unlock()
-		v.updateStatus()
-		v.Stop()
-		return err
-	case <-time.After(15 * time.Second):
-		v.mu.Lock()
-		v.authErr = nil
-		v.status.Connected = false
-		v.status.Reconnecting = false
-		v.status.Phase = "error"
-		v.mu.Unlock()
-		v.updateStatus()
-		v.Stop()
-		return fmt.Errorf("authentication timed out")
-	}
-
+	v.updateStatus()
 	return nil
 }
 
@@ -193,11 +164,9 @@ func (v *VPNCore) connectSignaling() error {
 	signaling.SetAuthToken(v.config.AuthToken)
 
 	authOK := make(chan struct{})
-	authErr := make(chan error, 1)
 	var authOnce sync.Once
 	v.mu.Lock()
 	v.authOK = authOK
-	v.authErr = authErr
 	v.mu.Unlock()
 
 	signaling.OnLocalID = func(id string) {
@@ -236,14 +205,12 @@ func (v *VPNCore) wireSignalingHandlers(signaling *SignalingClient) {
 
 		if virtualIP == "" {
 			v.log("OnRoomJoined: empty virtual_ip from server — aborting room setup")
-			v.completeRoomResult(fmt.Errorf("server assigned no virtual IP"))
 			if v.OnError != nil {
 				v.OnError("Server assigned no virtual IP")
 			}
 			return
 		}
 		v.log("Virtual IP: %s", virtualIP)
-		v.peers.Clear()
 
 		v.mu.Lock()
 		v.status.Room = room
@@ -346,18 +313,11 @@ func (v *VPNCore) wireSignalingHandlers(signaling *SignalingClient) {
 		signaling.OnRelayData = func(fromID string, data []byte) {
 			v.peers.HandleRelayPacket(data)
 		}
-		v.completeRoomResult(nil)
 	}
 
 	signaling.OnRoomDeleted = func(name string) {
 		v.log("Room deleted: %s", name)
 		v.cleanupRoomLocal()
-		v.mu.Lock()
-		deleteTarget := v.roomResultName
-		v.mu.Unlock()
-		if deleteTarget == name {
-			v.completeRoomResult(nil)
-		}
 		if v.OnRoomDeleted != nil {
 			v.OnRoomDeleted(name)
 		}
@@ -462,21 +422,6 @@ func (v *VPNCore) wireSignalingHandlers(signaling *SignalingClient) {
 
 	signaling.OnError = func(msg string) {
 		v.log("OnError: %s", msg)
-		v.mu.Lock()
-		authErr := v.authErr
-		roomResult := v.roomResult
-		v.mu.Unlock()
-		if authErr != nil {
-			select {
-			case authErr <- fmt.Errorf("%s", msg):
-			default:
-			}
-			return
-		}
-		if roomResult != nil {
-			v.completeRoomResult(fmt.Errorf("%s", msg))
-			return
-		}
 		if v.OnError != nil {
 			v.OnError(msg)
 		}
@@ -536,26 +481,12 @@ func (v *VPNCore) reconnectLoop(gen int, room, pass string) {
 
 		v.mu.Lock()
 		authOK := v.authOK
-		authErr := v.authErr
 		v.mu.Unlock()
 		if authOK != nil {
 			select {
 			case <-authOK:
-				v.mu.Lock()
-				v.authErr = nil
-				v.mu.Unlock()
-			case err := <-authErr:
-				v.log("Reconnect authentication failed: %v", err)
-				v.mu.Lock()
-				v.authErr = nil
-				v.mu.Unlock()
-				v.closeSignalingAttempt()
-				continue
 			case <-time.After(15 * time.Second):
 				v.log("Reconnect auth timeout")
-				v.mu.Lock()
-				v.authErr = nil
-				v.mu.Unlock()
 				v.closeSignalingAttempt()
 				continue
 			}
@@ -699,77 +630,33 @@ func (v *VPNCore) ownerTokenLocked(room string) string {
 	return v.ownerTokens[room]
 }
 
-func (v *VPNCore) completeRoomResult(err error) {
-	v.mu.Lock()
-	result := v.roomResult
-	v.roomResult = nil
-	v.roomResultName = ""
-	v.mu.Unlock()
-	if result != nil {
-		result <- err
-	}
-}
-
-func (v *VPNCore) roomOperation(name, password string, create bool) error {
-	result := make(chan error, 1)
-	v.mu.Lock()
-	previousName := v.lastRoomName
-	previousPass := v.lastRoomPass
-	v.roomResult = result
-	v.roomResultName = ""
-	v.lastRoomName = name
-	v.lastRoomPass = password
-	tok := v.ownerTokenLocked(name)
-	signaling := v.signaling
-	v.mu.Unlock()
-
-	if signaling == nil {
-		v.mu.Lock()
-		v.roomResult = nil
-		v.roomResultName = ""
-		v.lastRoomName = previousName
-		v.lastRoomPass = previousPass
-		v.mu.Unlock()
-		return fmt.Errorf("not connected")
-	}
-	if create {
-		signaling.CreateRoom(name, password)
-	} else {
-		signaling.JoinRoom(name, password, tok)
-	}
-
-	select {
-	case err := <-result:
-		if err != nil {
-			v.mu.Lock()
-			if v.roomResult == nil {
-				v.lastRoomName = previousName
-				v.lastRoomPass = previousPass
-			}
-			v.mu.Unlock()
-		}
-		return err
-	case <-time.After(15 * time.Second):
-		v.mu.Lock()
-		if v.roomResult == result {
-			v.roomResult = nil
-			v.roomResultName = ""
-			v.lastRoomName = previousName
-			v.lastRoomPass = previousPass
-		}
-		v.mu.Unlock()
-		return fmt.Errorf("room operation timed out")
-	}
-}
-
 func (v *VPNCore) CreateRoom(name, password string) error {
 	v.log("CreateRoom called: %s", name)
-	return v.roomOperation(name, password, true)
+	if v.signaling == nil {
+		return fmt.Errorf("not connected")
+	}
+	v.mu.Lock()
+	v.lastRoomName = name
+	v.lastRoomPass = password
+	v.mu.Unlock()
+	v.peers.Clear()
+	v.signaling.CreateRoom(name, password)
+	return nil
 }
 
 func (v *VPNCore) JoinRoom(name, password string) error {
 	v.log("JoinRoom called: %s", name)
-	return v.roomOperation(name, password, false)
+	if v.signaling == nil {
+		return fmt.Errorf("not connected")
+	}
+	v.mu.Lock()
+	v.lastRoomName = name
+	v.lastRoomPass = password
+	tok := v.ownerTokenLocked(name)
+	v.mu.Unlock()
+	v.peers.Clear()
+	v.signaling.JoinRoom(name, password, tok)
+	return nil
 }
 
 func (v *VPNCore) LeaveRoom() {
@@ -782,30 +669,14 @@ func (v *VPNCore) LeaveRoom() {
 
 func (v *VPNCore) DeleteRoom(name string) error {
 	v.log("DeleteRoom called: %s", name)
-	v.mu.Lock()
-	tok := v.ownerTokenLocked(name)
-	result := make(chan error, 1)
-	v.roomResult = result
-	v.roomResultName = name
-	signaling := v.signaling
-	v.mu.Unlock()
-	if signaling == nil {
-		v.completeRoomResult(fmt.Errorf("not connected"))
+	if v.signaling == nil {
 		return fmt.Errorf("not connected")
 	}
-	signaling.DeleteRoom(name, tok)
-	select {
-	case err := <-result:
-		return err
-	case <-time.After(15 * time.Second):
-		v.mu.Lock()
-		if v.roomResult == result {
-			v.roomResult = nil
-			v.roomResultName = ""
-		}
-		v.mu.Unlock()
-		return fmt.Errorf("delete operation timed out")
-	}
+	v.mu.Lock()
+	tok := v.ownerTokenLocked(name)
+	v.mu.Unlock()
+	v.signaling.DeleteRoom(name, tok)
+	return nil
 }
 
 func (v *VPNCore) GetStatus() ConnectionStatus {
@@ -838,14 +709,13 @@ func (v *VPNCore) startPeerListener() {
 	v.listenerMu.Lock()
 	defer v.listenerMu.Unlock()
 
-	v.mu.Lock()
-	oldConn := v.listenerConn
-	v.listenerConn = nil
-	v.mu.Unlock()
-	if oldConn != nil {
-		oldConn.Close()
-	}
 	v.peers.Stop()
+	v.mu.Lock()
+	if v.listenerConn != nil {
+		v.listenerConn.Close()
+		v.listenerConn = nil
+	}
+	v.mu.Unlock()
 
 	addr, _ := net.ResolveUDPAddr("udp4", ":0")
 	conn, err := net.ListenUDP("udp4", addr)
