@@ -541,7 +541,7 @@
   .network-item {
     display: flex;
     align-items: center;
-    padding: 10px 12px;
+    padding: 10px 12px 10px 14px;
     min-height: 44px;
     cursor: pointer;
     gap: 8px;
@@ -549,18 +549,30 @@
     transition: background 0.12s ease, opacity 0.12s ease;
     position: relative;
   }
+  .network-item::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    width: 2px;
+    background: transparent;
+  }
   .network-item:hover, .network-item:focus-visible {
     background: var(--bg-hover);
   }
   .network-item.active {
     background: var(--bg-active);
   }
+  .network-item.active::before {
+    background: var(--accent);
+  }
   .network-item.disabled {
     opacity: 0.55;
   }
   .network-indicator {
-    width: 4px;
-    height: 12px;
+    width: 6px;
+    height: 6px;
     background: var(--text-muted);
     flex-shrink: 0;
   }

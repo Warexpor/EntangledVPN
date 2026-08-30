@@ -90,7 +90,7 @@
 
   <div class="peer-table" role="table" aria-label={$t.networks}>
     <div class="table-row table-header-row" role="row">
-      <span class="sq-note" role="columnheader" aria-label={$t.col_status}></span>
+      <span class="col-status" role="columnheader">{$t.col_status}</span>
       <span class="col-name" role="columnheader">{$t.col_nickname}</span>
       <span class="col-ip" role="columnheader">{$t.col_ip}</span>
       <span class="col-ping" role="columnheader">{$t.col_ping}</span>
@@ -99,7 +99,7 @@
     </div>
 
     <div class="table-row self-row" role="row">
-      <span class="status-cell" role="cell">
+      <span class="col-status status-cell" role="cell">
         <span class="sq sq-online" aria-hidden="true"></span>
         <span class="status-text">{$t.status_online}</span>
       </span>
@@ -121,7 +121,7 @@
 
     {#each sortedPeers as peer (peer.id)}
       <div class="table-row" role="row">
-        <span class="status-cell" role="cell">
+        <span class="col-status status-cell" role="cell">
           <span class="sq {peer.connected ? 'sq-online' : 'sq-offline'}" aria-hidden="true"></span>
           <span class="status-text">{peer.connected ? $t.status_online : $t.status_offline}</span>
         </span>
@@ -183,7 +183,7 @@
     height: 100%;
   }
   .peer-header {
-    padding: 16px;
+    padding: 12px 16px;
     border-bottom: 1px solid var(--border);
     display: flex;
     align-items: center;
@@ -191,23 +191,28 @@
     background: var(--bg-surface);
     box-shadow: inset 0 -1px 0 var(--border-deep);
     flex-wrap: wrap;
+    min-height: 52px;
   }
   .peer-header h2 {
     font-size: calc(var(--font-size) * 1.25);
     font-weight: 600;
+    line-height: 1;
     color: var(--text-bright);
     text-transform: uppercase;
     letter-spacing: 0.5px;
   }
   .ip-badge {
-    padding: 4px 8px;
-    min-height: 28px;
+    padding: 0 8px;
+    height: 28px;
+    display: inline-flex;
+    align-items: center;
     background: var(--bg-raised);
     font-size: var(--font-size-xs);
     font-family: var(--font-mono);
     color: var(--text-secondary);
     border: 1px solid var(--border);
     cursor: pointer;
+    line-height: 1;
   }
   .ip-badge:hover { border-color: var(--border-hover); color: var(--text-bright); }
   .room-chat-btn {
@@ -217,10 +222,13 @@
     color: var(--text-secondary);
     font-family: var(--font-mono);
     font-size: var(--font-size-xs);
-    padding: 6px 10px;
-    min-height: 32px;
+    padding: 0 10px;
+    height: 32px;
+    display: inline-flex;
+    align-items: center;
     cursor: pointer;
     position: relative;
+    line-height: 1;
   }
   .room-chat-btn:hover { color: var(--text-bright); border-color: var(--border-hover); }
   .badge {
@@ -239,38 +247,56 @@
     overflow: auto;
     min-height: 0;
     min-width: 0;
+    --peer-cols: 92px minmax(0, 1.4fr) 118px 64px 80px 72px;
   }
   .table-row {
     display: grid;
-    grid-template-columns: minmax(64px, 0.8fr) minmax(90px, 1.3fr) minmax(90px, 1fr) minmax(50px, 0.7fr) minmax(60px, 0.8fr) auto;
+    grid-template-columns: var(--peer-cols);
     gap: 8px;
     align-items: center;
-    padding: 10px 16px;
+    padding: 0 16px;
     min-height: 40px;
     border-bottom: 1px solid var(--border-deep);
     font-size: var(--font-size-sm);
   }
+  .table-row > * {
+    min-width: 0;
+  }
   .table-header-row {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    background: var(--bg-primary);
     color: var(--text-muted);
     text-transform: uppercase;
     font-size: var(--font-size-xs);
     letter-spacing: 0.4px;
+    min-height: 32px;
   }
   .self-row { background: var(--bg-surface); }
+  .col-name {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    overflow: hidden;
+  }
   .nickname { color: var(--text-bright); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .self-tag {
-    margin-left: 6px;
+    flex-shrink: 0;
     font-size: var(--font-size-xs);
     color: var(--text-muted);
   }
   .col-ip, .col-ping, .col-path {
     font-family: var(--font-mono);
     color: var(--text-secondary);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
   .col-ping.probing { color: var(--text-bright); }
   .clickable { cursor: pointer; }
   .clickable:hover { color: var(--text-bright); }
-  .status-cell {
+  .col-status, .status-cell {
     display: flex;
     align-items: center;
     gap: 6px;
@@ -278,6 +304,7 @@
   .status-text {
     font-size: var(--font-size-xs);
     color: var(--text-secondary);
+    line-height: 1;
   }
   .sq {
     width: 8px;
@@ -319,12 +346,13 @@
   .empty-desc { font-size: var(--font-size-xs); }
   @media (max-width: 760px) {
     .peer-header { padding: 10px 12px; }
+    .peer-table { --peer-cols: 92px minmax(0, 1.4fr) 110px 56px 72px; }
     .table-row { padding-left: 12px; padding-right: 12px; gap: 6px; }
     .col-path { display: none; }
-    .table-row { grid-template-columns: minmax(58px, 0.8fr) minmax(82px, 1.3fr) minmax(78px, 1fr) minmax(48px, 0.7fr) auto; }
   }
   @media (max-width: 520px) {
+    .peer-table { --peer-cols: 16px minmax(0, 1fr) 96px 48px 64px; }
     .status-text { display: none; }
-    .table-row { grid-template-columns: 16px minmax(80px, 1fr) minmax(72px, 0.9fr) 48px auto; }
+    .table-header-row .col-status { visibility: hidden; }
   }
 </style>

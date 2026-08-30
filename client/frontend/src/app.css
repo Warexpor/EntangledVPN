@@ -42,7 +42,7 @@
   --z-toast:      1000;
   --z-alert:      1100;
   --sidebar-width: 220px;
-  --statusbar-height: 28px;
+  --statusbar-height: 32px;
   --font-display: 'Bungee', ui-sans-serif, system-ui, sans-serif;
   --font-mono: ui-monospace, 'Cascadia Code', 'SF Mono', Consolas, 'Liberation Mono', monospace;
   --font-size: calc(12px * var(--ui-scale));

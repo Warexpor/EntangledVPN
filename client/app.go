@@ -725,6 +725,14 @@ func (a *App) Quit() {
 	}
 }
 
+func (a *App) OpenLogFolder() error {
+	if err := vpncore.OpenLogFolder(); err != nil {
+		vpncore.Logger.Printf("OpenLogFolder: %v", err)
+		return err
+	}
+	return nil
+}
+
 var frontendCtx context.Context
 
 func emitEvent(event string, data interface{}) {
