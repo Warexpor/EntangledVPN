@@ -70,13 +70,17 @@ Clients use `wss://your.domain`. Open **3478/UDP** on the host for the relay (TC
 
 Secret-free deploy template: [scripts/deploy.example.sh](scripts/deploy.example.sh).
 
-## Quick start — Windows client
+## Quick start — Windows client (Wails)
 
-Needs: Go 1.22+, Node 18+, [Wails v2](https://wails.io/), Administrator privileges for Wintun.
+Needs: Go 1.23+, Node 20+, [Wails v2](https://wails.io/), Administrator privileges for Wintun.
 
 ```bash
 cd client/frontend && npm ci && npm run build && cd ../..
 cd client
+mkdir -p build/windows
+cp packaging/windows/icon.ico build/windows/
+cp packaging/windows/info.json build/windows/
+cp packaging/windows/app.manifest build/windows/wails.exe.manifest
 wails build
 ```
 
@@ -90,7 +94,7 @@ Saved networks store name/server only — **not** room passwords. Re-enter the p
 
 ## Quick start — Electron client (Linux)
 
-The Wails app is left as-is. Linux (and optional Windows Electron) live under [`electron/`](electron/README.md).
+Linux (and optional Windows Electron) live under [`electron/`](electron/README.md). Classic Wails remains the primary Windows client.
 
 ```bash
 cd electron
@@ -133,9 +137,16 @@ App version constant: `client/vpncore/version.go` (`AppVersion`).
 
 ## Releases
 
-**Windows client:** download **`Entangled.exe`** from the [GitHub Release](https://github.com/Warexpor/EntangledVPN/releases) and run it **as Administrator**. Wintun is embedded — the first launch writes `wintun.dll` next to the exe (leave that file there).
+Release assets are built by [`.github/workflows/release.yml`](.github/workflows/release.yml) on `v*` tags (or via **Actions → Release → Run workflow** for an existing tag).
 
-Server binaries (`entangled-server-linux-amd64`, `entangled-server-windows-amd64.exe`) are on the same Release.
+| Asset | Platform |
+|-------|----------|
+| `Entangled.exe` | Windows — classic Wails client (run **as Administrator**) |
+| `EntangledVPN-Setup-*-x64.exe` | Windows — optional Electron installer (also elevates for Wintun) |
+| `EntangledVPN-*-x86_64.AppImage` | Linux — Electron client |
+| `entangled-server-linux-amd64` / `entangled-server-windows-amd64.exe` | Signaling + relay server |
+
+Wintun is embedded in the Windows clients — first launch writes `wintun.dll` next to the exe (leave that file there).
 
 ## Credits
 

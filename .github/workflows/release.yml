@@ -1,0 +1,195 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Existing release tag to attach assets to (e.g. v1.4.0)"
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  linux-electron:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.23.x"
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: |
+            electron/package-lock.json
+            client/frontend/package-lock.json
+
+      - name: Build Linux AppImage
+        working-directory: electron
+        run: |
+          npm ci
+          npm run pack:linux
+
+      - name: Upload AppImage
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux-appimage
+          path: electron/dist-electron/EntangledVPN-*-x86_64.AppImage
+          if-no-files-found: error
+
+  windows-wails:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.23.x"
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: client/frontend/package-lock.json
+
+      - name: Install Wails
+        run: go install github.com/wailsapp/wails/v2/cmd/wails@v2.12.0
+
+      - name: Build frontend
+        working-directory: client/frontend
+        run: |
+          npm ci
+          npm run build
+
+      - name: Prepare Windows packaging assets
+        working-directory: client
+        shell: bash
+        run: |
+          mkdir -p build/windows
+          cp packaging/windows/icon.ico build/windows/icon.ico
+          cp packaging/windows/info.json build/windows/info.json
+          cp packaging/windows/app.manifest build/windows/wails.exe.manifest
+
+      - name: Build Wails client
+        working-directory: client
+        run: wails build -platform windows/amd64 -clean
+
+      - name: Upload Entangled.exe
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-wails
+          path: client/build/bin/Entangled.exe
+          if-no-files-found: error
+
+  windows-electron:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.23.x"
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: |
+            electron/package-lock.json
+            client/frontend/package-lock.json
+
+      - name: Build Windows Electron installer
+        working-directory: electron
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: "false"
+        run: |
+          npm ci
+          npm run build:ui
+          npm run build:sidecar
+          npx electron-builder --win nsis --x64
+
+      - name: Upload NSIS installer
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-electron
+          path: electron/dist-electron/EntangledVPN-Setup-*.exe
+          if-no-files-found: error
+
+  servers:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.23.x"
+
+      - name: Build server binaries
+        working-directory: server
+        run: |
+          CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -trimpath -ldflags="-s -w" -o ../dist/entangled-server-linux-amd64 .
+          CGO_ENABLED=0 GOOS=windows GOARCH=amd64 go build -trimpath -ldflags="-s -w" -o ../dist/entangled-server-windows-amd64.exe .
+
+      - name: Upload servers
+        uses: actions/upload-artifact@v4
+        with:
+          name: servers
+          path: |
+            dist/entangled-server-linux-amd64
+            dist/entangled-server-windows-amd64.exe
+          if-no-files-found: error
+
+  publish:
+    needs: [linux-electron, windows-wails, windows-electron, servers]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Resolve release tag
+        id: tag
+        shell: bash
+        run: |
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            echo "name=${{ inputs.tag }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "name=${GITHUB_REF_NAME}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Upload to GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          TAG="${{ steps.tag.outputs.name }}"
+          # Ensure the release exists (tag push creates it; dispatch attaches to an existing one)
+          if ! gh release view "$TAG" >/dev/null 2>&1; then
+            gh release create "$TAG" --title "Entangled VPN ${TAG#v}" --generate-notes
+          fi
+          mapfile -t FILES < <(find artifacts -type f \( \
+            -name 'EntangledVPN-*-x86_64.AppImage' -o \
+            -name 'Entangled.exe' -o \
+            -name 'EntangledVPN-Setup-*.exe' -o \
+            -name 'entangled-server-linux-amd64' -o \
+            -name 'entangled-server-windows-amd64.exe' \
+          \))
+          if [[ ${#FILES[@]} -eq 0 ]]; then
+            echo "No release assets found" >&2
+            find artifacts -type f
+            exit 1
+          fi
+          gh release upload "$TAG" "${FILES[@]}" --clobber
+          gh release view "$TAG" --json assets --jq '.assets[].name'

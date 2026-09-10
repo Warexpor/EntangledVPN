@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+### Added
+
+- GitHub Actions **Release** workflow: builds `Entangled.exe` (Wails), Windows Electron NSIS installer, Linux AppImage, and server binaries
+- Windows Electron NSIS setup (`EntangledVPN-Setup-*-x64.exe`) with `requireAdministrator`
+
 ## 1.4.0 — 2026-09-10
 
 ### Added

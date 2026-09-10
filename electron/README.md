@@ -43,10 +43,11 @@ TUN needs `CAP_NET_ADMIN` (install script prompts via pkexec). AppImage copies t
 
 ```bash
 npm run pack:linux     # AppImage + unpacked dir
-npm run pack:win       # optional Windows Electron build (mood)
+npm run pack:win       # Windows NSIS installer (needs Wine on Linux, or use CI)
+npm run pack:win:dir   # Windows unpacked dir (no installer)
 ```
 
-Windows Electron still uses Wintun via `vpncore` and needs Administrator for TUN — same as the Wails app.
+CI (`.github/workflows/release.yml`) builds the NSIS installer on `windows-latest`. The installer requests Administrator (Wintun), same as the classic Wails app.
 
 ## Protocol
 
