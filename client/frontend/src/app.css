@@ -43,6 +43,9 @@
   --z-alert:      1100;
   --sidebar-width: 220px;
   --statusbar-height: 32px;
+  --panel-header-height: 52px;
+  --panel-header-pad-x: 16px;
+  --panel-title-size: calc(var(--font-size) * 1.15);
   --font-display: 'Bungee', ui-sans-serif, system-ui, sans-serif;
   --font-mono: ui-monospace, 'Cascadia Code', 'SF Mono', Consolas, 'Liberation Mono', monospace;
   --font-size: calc(12px * var(--ui-scale));
@@ -181,6 +184,35 @@ a:hover { text-decoration: underline; }
   text-align: center;
   color: var(--text-muted);
   font-size: var(--font-size-sm);
+}
+
+/* Shared chrome for sidebar / main panel tops — keeps the split aligned. */
+.panel-header {
+  box-sizing: border-box;
+  height: var(--panel-header-height);
+  min-height: var(--panel-header-height);
+  max-height: var(--panel-header-height);
+  padding: 0 var(--panel-header-pad-x);
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-surface);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+  overflow: hidden;
+}
+.panel-header h2,
+.panel-title {
+  margin: 0;
+  font-size: var(--panel-title-size);
+  font-weight: 600;
+  line-height: 1;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-bright);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 @media (prefers-reduced-motion: reduce) {

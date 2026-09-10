@@ -2,15 +2,22 @@
 
 ## Unreleased
 
+## 1.4.0 — 2026-09-10
+
 ### Added
 
-- **Electron client** (`electron/`): Linux-primary shell + Go sidecar with NDJSON IPC; optional Windows Electron packaging (`npm run pack:win`)
+- **Electron client** (`electron/`): Linux-primary shell + Go sidecar with NDJSON IPC; AppImage + local install; optional Windows Electron packaging
 - Linux TUN adapter in `vpncore` (`tun_linux.go`) via `golang.zx2c4.com/wireguard/tun`
 - XDG config/state paths for non-Windows (`~/.config/entangledvpn`, `~/.local/state/entangledvpn`)
+
+### Changed
+
+- Shared Svelte UI polish (both Electron and Wails): panel header alignment, status-bar Disconnect spacing, settings checkbox sizing, peer-header lead cluster
 
 ### Notes
 
 - Classic Wails Windows client under `client/` remains the supported Windows path; Electron on Windows is optional
+- Linux TUN needs `CAP_NET_ADMIN` (install/pkexec `setcap` on the sidecar)
 
 ## 1.3.1 — 2026-08-30
 

@@ -75,11 +75,13 @@
 </script>
 
 <div class="peer-view">
-  <div class="peer-header">
-    <h2>{$status.room || $t.network}</h2>
-    <button class="ip-badge" on:click={() => copyIP($status.virtualIP)} title={$t.virtual_ip} aria-label={$t.copy_virtual_ip}>
-      {$status.virtualIP || $t.na}
-    </button>
+  <div class="peer-header panel-header">
+    <div class="peer-header-lead">
+      <h2>{$status.room || $t.network}</h2>
+      <button class="ip-badge" on:click={() => copyIP($status.virtualIP)} title={$t.virtual_ip} aria-label={$t.copy_virtual_ip}>
+        {$status.virtualIP || $t.na}
+      </button>
+    </div>
     {#if $status.room}
       <button class="room-chat-btn" on:click={openRoomChat} title={$t.room_chat}>
         [ {$t.chat} ]
@@ -183,29 +185,30 @@
     height: 100%;
   }
   .peer-header {
-    padding: 12px 16px;
-    border-bottom: 1px solid var(--border);
+    /* height/padding/border from .panel-header */
+    flex-wrap: nowrap;
+    gap: 12px;
+  }
+  .peer-header-lead {
     display: flex;
     align-items: center;
-    gap: 10px;
-    background: var(--bg-surface);
-    box-shadow: inset 0 -1px 0 var(--border-deep);
-    flex-wrap: wrap;
-    min-height: 52px;
+    gap: 8px;
+    min-width: 0;
+    flex: 1 1 auto;
   }
   .peer-header h2 {
-    font-size: calc(var(--font-size) * 1.25);
-    font-weight: 600;
-    line-height: 1;
-    color: var(--text-bright);
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
+    /* title chrome from .panel-header h2 */
+    flex: 0 1 auto;
+    min-width: 0;
   }
   .ip-badge {
+    box-sizing: border-box;
+    flex-shrink: 0;
     padding: 0 8px;
-    height: 28px;
+    height: 22px;
     display: inline-flex;
     align-items: center;
+    justify-content: center;
     background: var(--bg-raised);
     font-size: var(--font-size-xs);
     font-family: var(--font-mono);
@@ -216,14 +219,16 @@
   }
   .ip-badge:hover { border-color: var(--border-hover); color: var(--text-bright); }
   .room-chat-btn {
-    margin-left: auto;
+    box-sizing: border-box;
+    flex-shrink: 0;
+    margin-left: 0;
     background: transparent;
     border: 1px solid var(--border);
     color: var(--text-secondary);
     font-family: var(--font-mono);
     font-size: var(--font-size-xs);
     padding: 0 10px;
-    height: 32px;
+    height: 22px;
     display: inline-flex;
     align-items: center;
     cursor: pointer;
@@ -345,7 +350,6 @@
   }
   .empty-desc { font-size: var(--font-size-xs); }
   @media (max-width: 760px) {
-    .peer-header { padding: 10px 12px; }
     .peer-table { --peer-cols: 92px minmax(0, 1.4fr) 110px 56px 72px; }
     .table-row { padding-left: 12px; padding-right: 12px; gap: 6px; }
     .col-path { display: none; }

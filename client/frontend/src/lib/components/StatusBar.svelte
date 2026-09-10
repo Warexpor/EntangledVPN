@@ -129,16 +129,20 @@
   }
   .status-server { max-width: 28ch; }
   .status-room { max-width: 22ch; }
-  .status-ver { flex-shrink: 0; max-width: none; margin-left: 4px; }
+  .status-ver { flex-shrink: 0; max-width: none; }
   .disconnect-btn {
+    box-sizing: border-box;
     flex-shrink: 0;
-    height: 22px;
-    padding: 0 10px;
-    margin-right: 4px;
+    align-self: center;
+    height: 20px;
+    margin: 0;
+    padding: 0 9px;
     display: inline-flex;
     align-items: center;
+    justify-content: center;
     border: 1px solid var(--error);
     color: var(--error);
+    background: transparent;
     font-family: var(--font-mono);
     font-size: var(--font-size-xs);
     text-transform: uppercase;
@@ -147,6 +151,9 @@
   }
   .disconnect-btn:hover:not(:disabled) {
     background: rgba(226, 61, 61, 0.1);
+  }
+  .disconnect-btn:focus-visible {
+    outline-offset: 1px;
   }
   .degraded { color: var(--warning); }
   .sq {

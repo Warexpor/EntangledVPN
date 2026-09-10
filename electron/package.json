@@ -1,6 +1,6 @@
 {
   "name": "entangledvpn-electron",
-  "version": "1.3.1",
+  "version": "1.4.0",
   "private": true,
   "description": "Entangled VPN — Electron shell (Linux primary; Windows optional)",
   "main": "main.mjs",
@@ -32,7 +32,10 @@
       {
         "from": "sidecar/",
         "to": ".",
-        "filter": ["entangled-sidecar", "entangled-sidecar.exe"]
+        "filter": [
+          "entangled-sidecar",
+          "entangled-sidecar.exe"
+        ]
       },
       {
         "from": "ui-dist",

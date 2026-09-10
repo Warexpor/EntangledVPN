@@ -197,14 +197,18 @@
 
     <label class="setting-row toggle-row">
       <span class="setting-label">{$t.auto_connect}</span>
-      <input type="checkbox" bind:checked={cfg.autoConnect} />
-      <span class="toggle-label">{$t.auto_connect_desc}</span>
+      <span class="toggle-control">
+        <input type="checkbox" bind:checked={cfg.autoConnect} />
+        <span class="toggle-label">{$t.auto_connect_desc}</span>
+      </span>
     </label>
 
     <label class="setting-row toggle-row">
       <span class="setting-label">{$t.auto_join}</span>
-      <input type="checkbox" bind:checked={cfg.autoJoinLastRoom} />
-      <span class="toggle-label">{$t.auto_join_desc}</span>
+      <span class="toggle-control">
+        <input type="checkbox" bind:checked={cfg.autoJoinLastRoom} />
+        <span class="toggle-label">{$t.auto_join_desc}</span>
+      </span>
     </label>
   </div>
 
@@ -251,7 +255,9 @@
 
     <label class="setting-row toggle-row">
       <span class="setting-label">{$t.start_windows}</span>
-      <input type="checkbox" bind:checked={cfg.startWithWindows} />
+      <span class="toggle-control">
+        <input type="checkbox" bind:checked={cfg.startWithWindows} />
+      </span>
     </label>
 
     <div class="setting-row update-row">
@@ -402,14 +408,28 @@
     margin-bottom: 10px;
     min-height: 32px;
   }
+  .toggle-row {
+    align-items: flex-start;
+  }
   .setting-label {
     min-width: 140px;
     color: var(--text-secondary);
     font-size: var(--font-size-sm);
+    line-height: 1.3;
+    padding-top: 2px;
+  }
+  .toggle-control {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    flex: 1;
+    min-width: 0;
   }
   .toggle-label {
     color: var(--text-muted);
     font-size: var(--font-size-xs);
+    line-height: 1.35;
+    padding-top: 2px;
   }
   input[type="text"], input[type="password"], input[type="number"], select {
     flex: 1;
@@ -422,8 +442,18 @@
     font-size: var(--font-size-sm);
   }
   input[type="checkbox"] {
-    width: 18px;
-    height: 18px;
+    box-sizing: border-box;
+    appearance: auto;
+    -webkit-appearance: checkbox;
+    width: 16px;
+    height: 16px;
+    min-width: 16px;
+    min-height: 16px;
+    max-width: 16px;
+    max-height: 16px;
+    margin: 3px 0 0;
+    padding: 0;
+    flex: none;
     accent-color: var(--accent);
   }
   input[type="radio"] {
