@@ -20,11 +20,18 @@ func init() {
 }
 
 func LogDir() string {
-	appData := os.Getenv("APPDATA")
-	if appData == "" {
-		appData = os.TempDir()
+	// Windows Wails client uses %APPDATA%\EntangledVPN.
+	if appData := os.Getenv("APPDATA"); appData != "" {
+		return filepath.Join(appData, "EntangledVPN")
 	}
-	return filepath.Join(appData, "EntangledVPN")
+	// Linux / Electron: XDG state home.
+	if xdg := os.Getenv("XDG_STATE_HOME"); xdg != "" {
+		return filepath.Join(xdg, "entangledvpn")
+	}
+	if home, err := os.UserHomeDir(); err == nil && home != "" {
+		return filepath.Join(home, ".local", "state", "entangledvpn")
+	}
+	return filepath.Join(os.TempDir(), "entangledvpn")
 }
 
 func CurrentLogPath() string {

@@ -2,6 +2,16 @@
 
 ## Unreleased
 
+### Added
+
+- **Electron client** (`electron/`): Linux-primary shell + Go sidecar with NDJSON IPC; optional Windows Electron packaging (`npm run pack:win`)
+- Linux TUN adapter in `vpncore` (`tun_linux.go`) via `golang.zx2c4.com/wireguard/tun`
+- XDG config/state paths for non-Windows (`~/.config/entangledvpn`, `~/.local/state/entangledvpn`)
+
+### Notes
+
+- Classic Wails Windows client under `client/` remains the supported Windows path; Electron on Windows is optional
+
 ## 1.3.1 — 2026-08-30
 
 This replaces the withdrawn 1.3.1 / 1.3.2 GitHub releases.

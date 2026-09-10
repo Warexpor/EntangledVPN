@@ -3,6 +3,7 @@ package vpncore
 import (
 	"fmt"
 	"net"
+	"runtime"
 	"sync"
 	"time"
 )
@@ -19,6 +20,17 @@ func getLocalIPv4() string {
 		return localAddr.IP.String()
 	}
 	return "127.0.0.1"
+}
+
+func tunStartErrorHint(err error) string {
+	switch runtime.GOOS {
+	case "windows":
+		return "TUN adapter error (run as Administrator?): " + err.Error()
+	case "linux":
+		return "TUN adapter error (need CAP_NET_ADMIN — e.g. sudo setcap cap_net_admin,cap_net_raw+ep entangled-sidecar): " + err.Error()
+	default:
+		return "TUN adapter error: " + err.Error()
+	}
 }
 
 type VPNCore struct {
@@ -261,7 +273,7 @@ func (v *VPNCore) wireSignalingHandlers(signaling *SignalingClient) {
 		if err := v.tun.Start(virtualIP); err != nil {
 			v.log("TUN start error: %v", err)
 			if v.OnError != nil {
-				v.OnError("TUN adapter error (run as Administrator?): " + err.Error())
+				v.OnError(tunStartErrorHint(err))
 			}
 		} else {
 			v.log("TUN adapter started")

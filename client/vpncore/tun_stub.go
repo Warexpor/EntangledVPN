@@ -1,10 +1,10 @@
-//go:build !windows
+//go:build !windows && !linux
 
 package vpncore
 
 import "fmt"
 
-// Stub TUN for non-Windows (CI / unit tests). Real adapter is Windows+Wintun only.
+// Stub TUN for non-Windows/non-Linux (CI / unit tests on other GOOS).
 
 const (
 	WINTUN_NAME = "Entangled"
@@ -33,11 +33,11 @@ func (t *TUNAdapter) logf(format string, args ...interface{}) {
 }
 
 func (t *TUNAdapter) Start(ip string) error {
-	return fmt.Errorf("TUN/Wintun is Windows-only")
+	return fmt.Errorf("TUN is only supported on Windows and Linux")
 }
 
 func (t *TUNAdapter) AddRoute(dstIP string) error {
-	return fmt.Errorf("TUN/Wintun is Windows-only")
+	return fmt.Errorf("TUN is only supported on Windows and Linux")
 }
 
 func (t *TUNAdapter) RemoveRoute(dstIP string) error {

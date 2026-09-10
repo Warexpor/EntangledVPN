@@ -10,7 +10,8 @@ Create a virtual LAN (`10.242.0.0/24`), chat, and play over P2P UDP with automat
 
 | | |
 |---|---|
-| **Client** | Windows — Wails + Wintun (run as Administrator) |
+| **Client (classic)** | Windows — Wails + Wintun (run as Administrator) |
+| **Client (Electron)** | Linux primary (+ optional Windows) — see [`electron/`](electron/) |
 | **Server** | Linux or Windows — Go binary (WebSocket signaling + UDP relay) |
 | **Crypto** | X25519 + HKDF-only (`hkdf-v1`) + XChaCha20-Poly1305 |
 | **License** | [Apache-2.0](LICENSE) · [NOTICE](NOTICE) |
@@ -86,6 +87,23 @@ Run `build/bin/Entangled.exe` **as Administrator**.
 3. Share **Copy invite** — format `server|room|password` (password may be empty for open rooms).
 
 Saved networks store name/server only — **not** room passwords. Re-enter the password when joining a protected room.
+
+## Quick start — Electron client (Linux)
+
+The Wails app is left as-is. Linux (and optional Windows Electron) live under [`electron/`](electron/README.md).
+
+```bash
+cd electron
+npm install
+npm run build
+npm start
+```
+
+TUN creation needs `CAP_NET_ADMIN` (or root). Example:
+
+```bash
+sudo setcap cap_net_admin,cap_net_raw+ep sidecar/entangled-sidecar
+```
 
 ## Threat model (short)
 
