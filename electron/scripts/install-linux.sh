@@ -4,7 +4,7 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 DIST="$ROOT/dist-electron"
 APPDIR="$(find "$DIST" -maxdepth 2 -type d -name 'linux*-unpacked' | head -1)"
-APPIMAGE="$(find "$DIST" -maxdepth 1 -type f -name 'EntangledVPN-*.AppImage' | head -1)"
+APPIMAGE="$(find "$DIST" -maxdepth 1 -type f -name 'EntangledVPN-*.AppImage' | sort -V | tail -1)"
 
 OPT="${XDG_DATA_HOME:-$HOME/.local/share}/entangledvpn/app"
 BIN="$HOME/.local/bin"
