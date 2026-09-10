@@ -130,9 +130,9 @@
 </script>
 
 <div class="chat-view">
-  <div class="chat-header">
+  <div class="chat-header panel-header">
     <button class="back-btn" on:click={closeChat} title={$t.back} aria-label={$t.back}>&lt;</button>
-    <span class="chat-title">{title}</span>
+    <span class="chat-title panel-title">{title}</span>
   </div>
 
   <div class="chat-messages" role="log" aria-live="polite" aria-label={$t.chat} bind:this={chatContainer} on:scroll={onScroll}>
@@ -185,12 +185,7 @@
     height: 100%;
   }
   .chat-header {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    padding: 12px 16px;
-    border-bottom: 1px solid var(--border);
-    background: var(--bg-surface);
+    /* height/padding/border from .panel-header */
   }
   .back-btn {
     width: 28px;
@@ -203,10 +198,10 @@
     color: var(--text-secondary);
     cursor: pointer;
     font-family: var(--font-mono);
+    flex-shrink: 0;
   }
   .chat-title {
-    color: var(--text-bright);
-    font-size: var(--font-size);
+    min-width: 0;
   }
   .chat-messages {
     flex: 1;

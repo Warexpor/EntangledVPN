@@ -309,7 +309,7 @@
 </script>
 
 <aside class="sidebar" aria-label={$t.networks}>
-  <div class="sidebar-header">
+  <div class="sidebar-header panel-header">
     <h2>{$t.networks}</h2>
     <div class="sidebar-meta">
       {fmt($t.network_count, { n: savedRooms.length })}
@@ -506,20 +506,20 @@
     flex-shrink: 0;
   }
   .sidebar-header {
-    padding: 12px;
-    border-bottom: 1px solid var(--border);
+    /* height/padding/border from .panel-header */
+    justify-content: space-between;
   }
   .sidebar-header h2 {
-    font-size: 11px;
-    text-transform: uppercase;
-    letter-spacing: 1px;
     color: var(--text-secondary);
-    font-weight: 600;
+    flex: 0 1 auto;
+    min-width: 0;
   }
   .sidebar-meta {
     font-size: var(--font-size-xs);
     color: var(--text-muted);
-    margin-top: 4px;
+    line-height: 1;
+    margin: 0;
+    flex-shrink: 0;
   }
   .sidebar-actions {
     padding: 8px;

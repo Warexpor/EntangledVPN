@@ -34,7 +34,7 @@ npm run install:linux   # installs to ~/.local and adds app menu entry
 Then run `entangledvpn` or open **Entangled VPN** from your app menu.
 
 Artifacts:
-- `electron/dist-electron/EntangledVPN-1.3.1-x86_64.AppImage`
+- `electron/dist-electron/EntangledVPN-1.4.0-x86_64.AppImage`
 - `electron/dist-electron/linux-unpacked/`
 
 TUN needs `CAP_NET_ADMIN` (install script prompts via pkexec). AppImage copies the sidecar into user data on first run and may ask again for setcap.
