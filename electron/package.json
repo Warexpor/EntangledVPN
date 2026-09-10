@@ -1,0 +1,72 @@
+{
+  "name": "entangledvpn-electron",
+  "version": "1.3.1",
+  "private": true,
+  "description": "Entangled VPN — Electron shell (Linux primary; Windows optional)",
+  "main": "main.mjs",
+  "type": "module",
+  "scripts": {
+    "postinstall": "bash scripts/ensure-electron.sh || true",
+    "build:sidecar": "bash scripts/build-sidecar.sh",
+    "build:ui": "npm --prefix ../client/frontend install && bash -c 'cd ../client/frontend && npx vite build --base=./ --outDir ../../electron/ui-dist --emptyOutDir'",
+    "build": "npm run build:sidecar && npm run build:ui",
+    "start": "bash scripts/ensure-electron.sh && npm run build:sidecar && electron .",
+    "dev": "bash scripts/ensure-electron.sh && npm run build:sidecar && electron . --dev",
+    "pack:linux": "npm run build && electron-builder --linux AppImage dir",
+    "install:linux": "bash scripts/install-linux.sh",
+    "pack:win": "npm run build && electron-builder --win dir"
+  },
+  "build": {
+    "appId": "app.entangled.vpn",
+    "productName": "Entangled VPN",
+    "directories": {
+      "output": "dist-electron",
+      "buildResources": "build"
+    },
+    "files": [
+      "main.mjs",
+      "preload.cjs",
+      "package.json"
+    ],
+    "extraResources": [
+      {
+        "from": "sidecar/",
+        "to": ".",
+        "filter": ["entangled-sidecar", "entangled-sidecar.exe"]
+      },
+      {
+        "from": "ui-dist",
+        "to": "ui"
+      }
+    ],
+    "linux": {
+      "target": [
+        "AppImage",
+        "dir"
+      ],
+      "category": "Network",
+      "icon": "build/icon.png",
+      "synopsis": "Mesh VPN for small friend groups",
+      "desktop": {
+        "Name": "Entangled VPN",
+        "Comment": "Mesh VPN for small friend groups",
+        "Categories": "Network;Security;",
+        "StartupWMClass": "entangledvpn-electron"
+      },
+      "artifactName": "EntangledVPN-${version}-${arch}.${ext}"
+    },
+    "win": {
+      "target": [
+        "dir"
+      ],
+      "artifactName": "EntangledVPN-Electron-${version}-${arch}.${ext}"
+    }
+  },
+  "devDependencies": {
+    "electron": "^33.2.0",
+    "electron-builder": "^25.1.8"
+  },
+  "allowScripts": {
+    "electron@33.4.11": true
+  }
+}

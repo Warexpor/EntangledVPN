@@ -6,12 +6,18 @@
 *.dylib
 entangled-server*
 entangled-client*
+entangled-sidecar
+entangled-sidecar.exe
 
 # Build output (do not ignore client/frontend/dist — go:embed needs it tracked)
 build/bin/
 build/
 client/build/
 dist-release/
+electron/dist-electron/
+electron/ui-dist/
+!electron/build/
+!electron/build/**
 # Node
 node_modules/
 **/node_modules/
