@@ -14,7 +14,8 @@
     "dev": "bash scripts/ensure-electron.sh && npm run build:sidecar && electron . --dev",
     "pack:linux": "npm run build && electron-builder --linux AppImage dir",
     "install:linux": "bash scripts/install-linux.sh",
-    "pack:win": "npm run build && electron-builder --win dir"
+    "pack:win": "npm run build:ui && GOOS=windows GOARCH=amd64 npm run build:sidecar && electron-builder --win nsis --x64 -c.win.signAndEditExecutable=false",
+    "pack:win:dir": "npm run build:ui && GOOS=windows GOARCH=amd64 npm run build:sidecar && electron-builder --win dir --x64 -c.win.signAndEditExecutable=false"
   },
   "build": {
     "appId": "app.entangled.vpn",
@@ -60,9 +61,20 @@
     },
     "win": {
       "target": [
-        "dir"
+        "nsis"
       ],
-      "artifactName": "EntangledVPN-Electron-${version}-${arch}.${ext}"
+      "icon": "build/icon.ico",
+      "requestedExecutionLevel": "requireAdministrator",
+      "artifactName": "EntangledVPN-Setup-${version}-${arch}.${ext}"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "Entangled VPN",
+      "uninstallDisplayName": "Entangled VPN",
+      "artifactName": "EntangledVPN-Setup-${version}-${arch}.${ext}"
     }
   },
   "devDependencies": {
