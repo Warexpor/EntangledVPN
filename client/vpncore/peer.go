@@ -108,7 +108,12 @@ func (pm *PeerManager) Stop() {
 		return
 	default:
 		close(pm.stop)
+		conn := pm.sharedConn
 		pm.mu.Unlock()
+		// Unblock reader() stuck in ReadFromUDP before Wait.
+		if conn != nil {
+			_ = conn.Close()
+		}
 	}
 	pm.wg.Wait()
 }
@@ -507,29 +512,18 @@ func (pm *PeerManager) processPeerPayload(srcVIP string, payload []byte, isRelay
 func (pm *PeerManager) findPeerByAddr(addr string) *Peer {
 	pm.mu.RLock()
 	defer pm.mu.RUnlock()
-	host := addr
-	if h, _, err := net.SplitHostPort(addr); err == nil {
-		host = h
-	}
 	for _, peer := range pm.peers {
 		peer.mu.Lock()
 		var match bool
-		if peer.remoteUDP != nil {
-			match = peer.remoteUDP.String() == addr || peer.remoteUDP.IP.String() == host
-			if match && peer.remoteUDP.String() != addr {
-				if a, err := net.ResolveUDPAddr("udp", addr); err == nil {
-					peer.remoteUDP = a
-					// Keep learned mapping in the candidate set for later sends.
-					peer.candidates = prependCandidate(peer.candidates, a)
-				}
-			}
+		if peer.remoteUDP != nil && peer.remoteUDP.String() == addr {
+			match = true
 		}
 		if !match {
 			for _, c := range peer.candidates {
 				if c == nil {
 					continue
 				}
-				if c.String() == addr || c.IP.String() == host {
+				if c.String() == addr {
 					match = true
 					if a, err := net.ResolveUDPAddr("udp", addr); err == nil {
 						peer.remoteUDP = a

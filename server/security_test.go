@@ -57,13 +57,19 @@ func TestRelayTokenValidate(t *testing.T) {
 	c := &Client{ID: "abc", VirtualIP: "10.242.0.2"}
 	h.Clients[c.ID] = c
 	tok := h.issueRelayToken(c, "10.242.0.2")
-	if !h.ValidateRelayReg(tok, "10.242.0.2") {
+	if !h.ValidateRelayReg(tok, "10.242.0.2", "1.2.3.4:5") {
 		t.Fatal("expected valid token")
 	}
-	if h.ValidateRelayReg(tok, "10.242.0.3") {
+	if h.ValidateRelayReg(tok, "10.242.0.2", "9.9.9.9:9") {
+		t.Fatal("UDP bind mismatch should fail")
+	}
+	if !h.ValidateRelayReg(tok, "10.242.0.2", "1.2.3.4:5") {
+		t.Fatal("same UDP bind should still work")
+	}
+	if h.ValidateRelayReg(tok, "10.242.0.3", "1.2.3.4:5") {
 		t.Fatal("vip mismatch should fail")
 	}
-	if h.ValidateRelayReg("nope", "10.242.0.2") {
+	if h.ValidateRelayReg("nope", "10.242.0.2", "1.2.3.4:5") {
 		t.Fatal("bad token should fail")
 	}
 	if !h.VIPAssigned("10.242.0.2") {
@@ -86,7 +92,7 @@ func TestParseRelayRegTokenOnly(t *testing.T) {
 	binary.BigEndian.PutUint32(legacy[0:4], relayMagic)
 	legacy[4] = relayTypeReg
 	copy(legacy[5:], "10.242.0.2")
-	if _, ok := r.parseRelayReg(legacy); ok {
+	if _, ok := r.parseRelayReg(legacy, "1.2.3.4:5"); ok {
 		t.Fatal("legacy VIP-only REG should be rejected")
 	}
 
@@ -97,7 +103,7 @@ func TestParseRelayRegTokenOnly(t *testing.T) {
 	pkt[5] = byte(len(tok))
 	copy(pkt[6:], tok)
 	copy(pkt[6+len(tok):], "10.242.0.2")
-	vip, ok := r.parseRelayReg(pkt)
+	vip, ok := r.parseRelayReg(pkt, "1.2.3.4:5")
 	if !ok || vip != "10.242.0.2" {
 		t.Fatalf("token reg failed: ok=%v vip=%q", ok, vip)
 	}
@@ -108,7 +114,7 @@ func TestParseRelayRegTokenOnly(t *testing.T) {
 	emptyTok[4] = relayTypeReg
 	emptyTok[5] = 0
 	copy(emptyTok[6:], "10.242.0.2")
-	if _, ok := r.parseRelayReg(emptyTok); ok {
+	if _, ok := r.parseRelayReg(emptyTok, "1.2.3.4:5"); ok {
 		t.Fatal("empty-token REG should fail")
 	}
 
@@ -119,7 +125,7 @@ func TestParseRelayRegTokenOnly(t *testing.T) {
 	bad[5] = 4
 	copy(bad[6:], "nope")
 	copy(bad[10:], "10.242.0.2")
-	if _, ok := r.parseRelayReg(bad); ok {
+	if _, ok := r.parseRelayReg(bad, "1.2.3.4:5"); ok {
 		t.Fatal("bad token should fail")
 	}
 }
@@ -162,17 +168,12 @@ func TestRoomOwnerToken(t *testing.T) {
 	}
 }
 
-func TestLegacyOwnerClaimIssuesToken(t *testing.T) {
+func TestLegacyOwnerClaimRefused(t *testing.T) {
 	room := NewRoom("legacy", "", "stale-id", "")
 	first := &Client{ID: "first"}
 	ok, tok := room.claimOwner(first, "")
-	if !ok || tok == "" {
-		t.Fatal("legacy room should issue owner token on first claim")
-	}
-	second := &Client{ID: "second"}
-	ok, _ = room.claimOwner(second, "")
-	if ok {
-		t.Fatal("second joiner without token must not become owner")
+	if ok || tok != "" {
+		t.Fatal("empty-token reclaim must be refused")
 	}
 }
 

@@ -37,13 +37,14 @@ func TestParseRelease(t *testing.T) {
 		}{
 			{Name: "entangled-server-linux-amd64", BrowserDownloadURL: "https://github.com/Warexpor/EntangledVPN/releases/download/v1.2.0/server"},
 			{Name: "Entangled.exe", BrowserDownloadURL: "https://github.com/Warexpor/EntangledVPN/releases/download/v1.2.0/Entangled.exe"},
+			{Name: "Entangled.exe.sha256", BrowserDownloadURL: "https://github.com/Warexpor/EntangledVPN/releases/download/v1.2.0/Entangled.exe.sha256"},
 		},
 	}
 	info, err := parseRelease("1.1.0", rel)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !info.Available || info.Latest != "1.2.0" || info.AssetURL == "" {
+	if !info.Available || info.Latest != "1.2.0" || info.AssetURL == "" || info.shaURL == "" {
 		t.Fatalf("unexpected: %+v", info)
 	}
 
@@ -53,6 +54,22 @@ func TestParseRelease(t *testing.T) {
 	}
 	if info.Available {
 		t.Fatal("same version should not be available")
+	}
+}
+
+func TestParseReleaseMissingSHA(t *testing.T) {
+	rel := ghRelease{
+		TagName: "v9.0.0",
+		Assets: []struct {
+			Name               string `json:"name"`
+			BrowserDownloadURL string `json:"browser_download_url"`
+		}{
+			{Name: "Entangled.exe", BrowserDownloadURL: "https://github.com/Warexpor/EntangledVPN/releases/download/v9.0.0/Entangled.exe"},
+		},
+	}
+	_, err := parseRelease("1.0.0", rel)
+	if err == nil {
+		t.Fatal("expected missing sha256 asset error")
 	}
 }
 

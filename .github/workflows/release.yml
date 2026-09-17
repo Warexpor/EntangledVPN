@@ -182,6 +182,7 @@ jobs:
           mapfile -t FILES < <(find artifacts -type f \( \
             -name 'EntangledVPN-*-x86_64.AppImage' -o \
             -name 'Entangled.exe' -o \
+            -name 'Entangled.exe.sha256' -o \
             -name 'EntangledVPN-Setup-*.exe' -o \
             -name 'entangled-server-linux-amd64' -o \
             -name 'entangled-server-windows-amd64.exe' \
@@ -190,6 +191,12 @@ jobs:
             echo "No release assets found" >&2
             find artifacts -type f
             exit 1
+          fi
+          # Publish SHA-256 for Windows Wails in-app update integrity checks.
+          EXE="$(find artifacts -type f -name 'Entangled.exe' | head -n1 || true)"
+          if [[ -n "$EXE" ]]; then
+            sha256sum "$EXE" | awk '{print $1"  Entangled.exe"}' > artifacts/Entangled.exe.sha256
+            FILES+=("artifacts/Entangled.exe.sha256")
           fi
           gh release upload "$TAG" "${FILES[@]}" --clobber
           gh release view "$TAG" --json assets --jq '.assets[].name'

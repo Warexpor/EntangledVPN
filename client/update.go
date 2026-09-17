@@ -1,6 +1,8 @@
 package main
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -19,6 +21,7 @@ import (
 const (
 	updateRepoAPI   = "https://api.github.com/repos/Warexpor/EntangledVPN/releases/latest"
 	updateAssetName = "Entangled.exe"
+	updateSHAName   = "Entangled.exe.sha256"
 	updateUserAgent = "EntangledVPN/" + vpncore.AppVersion
 )
 
@@ -29,6 +32,8 @@ type UpdateInfo struct {
 	Available bool   `json:"available"`
 	Notes     string `json:"notes"`
 	AssetURL  string `json:"assetURL"`
+	SHA256    string `json:"sha256"`
+	shaURL    string
 }
 
 type ghRelease struct {
@@ -59,7 +64,10 @@ func (a *App) ApplyUpdate() error {
 	if !info.Available || info.AssetURL == "" {
 		return fmt.Errorf("no update available")
 	}
-	if err := applyUpdateFromURL(info.AssetURL); err != nil {
+	if info.SHA256 == "" {
+		return fmt.Errorf("update rejected: missing release SHA-256")
+	}
+	if err := applyUpdateFromURL(info.AssetURL, info.SHA256); err != nil {
 		return err
 	}
 	// Quit so the swap script can replace the locked exe.
@@ -96,7 +104,16 @@ func fetchLatestUpdate() (UpdateInfo, error) {
 	if err := json.Unmarshal(body, &rel); err != nil {
 		return out, err
 	}
-	return parseRelease(current, rel)
+	info, err := parseRelease(current, rel)
+	if err != nil {
+		return out, err
+	}
+	digest, err := fetchSHA256Digest(info.shaURL)
+	if err != nil {
+		return out, err
+	}
+	info.SHA256 = digest
+	return info, nil
 }
 
 func parseRelease(current string, rel ghRelease) (UpdateInfo, error) {
@@ -109,19 +126,29 @@ func parseRelease(current string, rel ghRelease) (UpdateInfo, error) {
 	out.Notes = truncateNotes(rel.Body, 2000)
 
 	assetURL := ""
+	shaURL := ""
 	for _, a := range rel.Assets {
-		if a.Name == updateAssetName {
+		switch a.Name {
+		case updateAssetName:
 			assetURL = a.BrowserDownloadURL
-			break
+		case updateSHAName:
+			shaURL = a.BrowserDownloadURL
 		}
 	}
 	if assetURL == "" {
 		return out, fmt.Errorf("%s not found in latest release", updateAssetName)
 	}
+	if shaURL == "" {
+		return out, fmt.Errorf("%s not found in latest release (required for integrity)", updateSHAName)
+	}
 	if err := validateDownloadURL(assetURL); err != nil {
 		return out, err
 	}
+	if err := validateDownloadURL(shaURL); err != nil {
+		return out, err
+	}
 	out.AssetURL = assetURL
+	out.shaURL = shaURL
 
 	cmp, err := compareSemver(latest, current)
 	if err != nil {
@@ -129,6 +156,42 @@ func parseRelease(current string, rel ghRelease) (UpdateInfo, error) {
 	}
 	out.Available = cmp > 0
 	return out, nil
+}
+
+func fetchSHA256Digest(shaURL string) (string, error) {
+	client := &http.Client{Timeout: 30 * time.Second}
+	req, err := http.NewRequest(http.MethodGet, shaURL, nil)
+	if err != nil {
+		return "", err
+	}
+	req.Header.Set("User-Agent", updateUserAgent)
+	resp, err := client.Do(req)
+	if err != nil {
+		return "", err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return "", fmt.Errorf("sha256 download: HTTP %d", resp.StatusCode)
+	}
+	if err := validateDownloadURL(resp.Request.URL.String()); err != nil {
+		return "", err
+	}
+	body, err := io.ReadAll(io.LimitReader(resp.Body, 4096))
+	if err != nil {
+		return "", err
+	}
+	fields := strings.Fields(string(body))
+	if len(fields) == 0 {
+		return "", fmt.Errorf("empty sha256 file")
+	}
+	digest := strings.ToLower(fields[0])
+	if len(digest) != 64 {
+		return "", fmt.Errorf("invalid sha256 digest")
+	}
+	if _, err := hex.DecodeString(digest); err != nil {
+		return "", fmt.Errorf("invalid sha256 digest")
+	}
+	return digest, nil
 }
 
 func truncateNotes(s string, max int) string {
@@ -200,9 +263,13 @@ func parseSemver(v string) ([3]int, error) {
 	return out, nil
 }
 
-func applyUpdateFromURL(assetURL string) error {
+func applyUpdateFromURL(assetURL, wantSHA256 string) error {
 	if err := validateDownloadURL(assetURL); err != nil {
 		return err
+	}
+	wantSHA256 = strings.ToLower(strings.TrimSpace(wantSHA256))
+	if len(wantSHA256) != 64 {
+		return fmt.Errorf("invalid expected sha256")
 	}
 	exe, err := os.Executable()
 	if err != nil {
@@ -237,7 +304,8 @@ func applyUpdateFromURL(assetURL string) error {
 	if err != nil {
 		return err
 	}
-	_, copyErr := io.Copy(f, io.LimitReader(resp.Body, 200<<20)) // 200 MiB cap
+	h := sha256.New()
+	_, copyErr := io.Copy(f, io.TeeReader(io.LimitReader(resp.Body, 200<<20), h))
 	closeErr := f.Close()
 	if copyErr != nil {
 		os.Remove(newPath)
@@ -246,6 +314,11 @@ func applyUpdateFromURL(assetURL string) error {
 	if closeErr != nil {
 		os.Remove(newPath)
 		return closeErr
+	}
+	got := hex.EncodeToString(h.Sum(nil))
+	if got != wantSHA256 {
+		os.Remove(newPath)
+		return fmt.Errorf("update hash mismatch")
 	}
 
 	script := filepath.Join(os.TempDir(), "entangled-update.cmd")

@@ -37,7 +37,7 @@ cat > "$APPS/entangledvpn.desktop" <<EOF
 Type=Application
 Name=Entangled VPN
 Comment=Mesh VPN for small friend groups
-Exec=$EXEC --no-sandbox %U
+Exec=$EXEC %U
 Icon=entangledvpn
 Terminal=false
 Categories=Network;Security;

@@ -188,9 +188,41 @@ func (a *App) writeRooms(rooms []SavedRoomEntry) {
 		vpncore.Logger.Printf("SaveRoom: marshal error: %v", err)
 		return
 	}
-	if err := os.WriteFile(roomsPath(), data, 0600); err != nil {
+	if err := writeFileAtomic(roomsPath(), data, 0600); err != nil {
 		vpncore.Logger.Printf("SaveRoom: write error: %v", err)
 	}
+}
+
+
+func writeFileAtomic(path string, data []byte, perm os.FileMode) error {
+	dir := filepath.Dir(path)
+	tmp, err := os.CreateTemp(dir, ".entangled-tmp-*")
+	if err != nil {
+		return err
+	}
+	tmpName := tmp.Name()
+	ok := false
+	defer func() {
+		if !ok {
+			_ = os.Remove(tmpName)
+		}
+	}()
+	if _, err := tmp.Write(data); err != nil {
+		tmp.Close()
+		return err
+	}
+	if err := tmp.Chmod(perm); err != nil {
+		tmp.Close()
+		return err
+	}
+	if err := tmp.Close(); err != nil {
+		return err
+	}
+	if err := os.Rename(tmpName, path); err != nil {
+		return err
+	}
+	ok = true
+	return nil
 }
 
 func (a *App) RemoveSavedRoom(name string) {
@@ -315,7 +347,7 @@ func (a *App) SaveConfig(cfg ClientConfig) {
 		vpncore.Logger.Printf("SaveConfig: marshal error: %v", err)
 		return
 	}
-	if err := os.WriteFile(configPath(), data, 0600); err != nil {
+	if err := writeFileAtomic(configPath(), data, 0600); err != nil {
 		vpncore.Logger.Printf("SaveConfig: write error: %v", err)
 	}
 }
@@ -554,6 +586,14 @@ func (a *App) wireVPN(vpn *vpncore.VPNCore) {
 	vpn.OnOwnerToken = func(room, token string) {
 		a.saveOwnerToken(room, token)
 	}
+	vpn.OnRoomJoined = func(room, password string) {
+		a.lastRoomName = room
+		if password != "" {
+			a.lastRoomPass = password
+		}
+		a.SaveRoom(room, a.lastRoomPass)
+		a.persistLastRoom(room, a.lastRoomPass != "")
+	}
 }
 
 func (a *App) emitEvent(event string, data interface{}) {
@@ -585,14 +625,10 @@ func (a *App) CreateRoom(name, password string) error {
 	if vpn == nil {
 		return fmt.Errorf("not connected")
 	}
-	if err := vpn.CreateRoom(name, password); err != nil {
-		return err
-	}
 	a.lastRoomName = name
 	a.lastRoomPass = password
-	a.SaveRoom(name, password)
-	a.persistLastRoom(name, password != "")
-	return nil
+	// Persist only after server room_joined (OnRoomJoined).
+	return vpn.CreateRoom(name, password)
 }
 
 func (a *App) JoinRoom(name, password string) error {
@@ -605,14 +641,9 @@ func (a *App) JoinRoom(name, password string) error {
 	if vpn == nil {
 		return fmt.Errorf("not connected")
 	}
-	if err := vpn.JoinRoom(name, password); err != nil {
-		return err
-	}
 	a.lastRoomName = name
 	a.lastRoomPass = password
-	a.SaveRoom(name, password)
-	a.persistLastRoom(name, password != "")
-	return nil
+	return vpn.JoinRoom(name, password)
 }
 
 func (a *App) LeaveRoom() {
@@ -697,10 +728,8 @@ func (a *App) CopyText(text string) {
 
 func (a *App) FormatInvite(room, password string) string {
 	cfg := a.LoadConfig()
-	if password == "" && room == a.lastRoomName {
-		password = a.lastRoomPass
-	}
-	return cfg.ServerAddr + "|" + room + "|" + password
+	_ = password
+	return cfg.ServerAddr + "|" + room
 }
 
 func (a *App) ParseInvite(invite string) (map[string]string, error) {
