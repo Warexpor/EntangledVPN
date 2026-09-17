@@ -1,5 +1,6 @@
 import { app, BrowserWindow, clipboard, ipcMain, shell } from 'electron'
 import { spawn, spawnSync } from 'node:child_process'
+import { createHash } from 'node:crypto'
 import { createInterface } from 'node:readline'
 import fs from 'node:fs'
 import path from 'node:path'
@@ -36,6 +37,12 @@ function sidecarPath() {
 }
 
 /** AppImage/squashfs can't keep file capabilities — copy sidecar to a writable path and setcap. */
+function fileSHA256(p) {
+  const h = createHash('sha256')
+  h.update(fs.readFileSync(p))
+  return h.digest('hex')
+}
+
 function resolveRunnableSidecar() {
   const bundled = sidecarPath()
   if (process.platform !== 'linux' || !app.isPackaged) {
@@ -44,18 +51,20 @@ function resolveRunnableSidecar() {
   if (!fs.existsSync(bundled)) {
     throw new Error(`sidecar binary missing: ${bundled}`)
   }
+  const bundledHash = fileSHA256(bundled)
   const destDir = path.join(app.getPath('userData'), 'bin')
   const dest = path.join(destDir, 'entangled-sidecar')
   fs.mkdirSync(destDir, { recursive: true })
-  const bundledStat = fs.statSync(bundled)
   let needCopy = !fs.existsSync(dest)
   if (!needCopy) {
-    const destStat = fs.statSync(dest)
-    needCopy = bundledStat.size !== destStat.size || bundledStat.mtimeMs > destStat.mtimeMs
+    needCopy = fileSHA256(dest) !== bundledHash
   }
   if (needCopy) {
     fs.copyFileSync(bundled, dest)
     fs.chmodSync(dest, 0o755)
+  }
+  if (fileSHA256(dest) !== bundledHash) {
+    throw new Error('sidecar integrity check failed before setcap')
   }
   ensureLinuxTunCaps(dest)
   return dest
@@ -187,7 +196,7 @@ function createWindow() {
       preload: path.join(__dirname, 'preload.cjs'),
       contextIsolation: true,
       nodeIntegration: false,
-      sandbox: false,
+      sandbox: true,
     },
   })
 

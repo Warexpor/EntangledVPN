@@ -2,6 +2,7 @@ package main
 
 import (
 	"crypto/rand"
+	"crypto/sha256"
 	"crypto/subtle"
 	"encoding/base64"
 	"encoding/hex"
@@ -10,6 +11,7 @@ import (
 	"log"
 	"net"
 	"os"
+	"path/filepath"
 	"strings"
 	"sync"
 	"time"
@@ -18,30 +20,33 @@ import (
 )
 
 type StoredRoom struct {
-	Name         string `json:"name"`
-	PasswordHash string `json:"password_hash,omitempty"`
-	Password     string `json:"password,omitempty"` // legacy plaintext; migrated on load
-	CreatedAt    string `json:"created_at"`
-	OwnerID      string `json:"owner_id"`
-	OwnerToken   string `json:"owner_token,omitempty"`
-	OwnerPubKey  string `json:"owner_pubkey,omitempty"` // legacy metadata only; not used for auth
+	Name           string `json:"name"`
+	PasswordHash   string `json:"password_hash,omitempty"`
+	Password       string `json:"password,omitempty"` // legacy plaintext; migrated on load
+	CreatedAt      string `json:"created_at"`
+	OwnerID        string `json:"owner_id"`
+	OwnerToken     string `json:"owner_token,omitempty"` // legacy plaintext; migrated to hash on save
+	OwnerTokenHash string `json:"owner_token_hash,omitempty"`
+	OwnerPubKey    string `json:"owner_pubkey,omitempty"` // legacy metadata only; not used for auth
 }
 
 type Room struct {
-	Name         string
-	PasswordHash string
-	OwnerID      string
-	OwnerToken   string
-	OwnerPubKey  string // legacy metadata only; not used for auth
-	CreatedAt    string
-	Clients      map[string]*Client
-	mu           sync.RWMutex
+	Name           string
+	PasswordHash   string
+	OwnerID        string
+	OwnerToken     string // in-memory plaintext when freshly issued
+	OwnerTokenHash string
+	OwnerPubKey    string // legacy metadata only; not used for auth
+	CreatedAt      string
+	Clients        map[string]*Client
+	mu             sync.RWMutex
 }
 
 type RelayTokenEntry struct {
 	VirtualIP string
 	ClientID  string
 	Expiry    time.Time
+	BoundUDP  string // first successful REG remote; empty until bound
 }
 
 func NewRoom(name, passwordHash, ownerID, ownerToken string) *Room {
@@ -77,25 +82,31 @@ func (r *Room) isOwner(c *Client) bool {
 }
 
 func (r *Room) validOwnerToken(token string) bool {
-	if r == nil || r.OwnerToken == "" || token == "" {
+	if r == nil || token == "" {
 		return false
 	}
-	return subtle.ConstantTimeCompare([]byte(r.OwnerToken), []byte(token)) == 1
+	if r.OwnerToken != "" {
+		return subtle.ConstantTimeCompare([]byte(r.OwnerToken), []byte(token)) == 1
+	}
+	if r.OwnerTokenHash != "" {
+		sum := sha256.Sum256([]byte(token))
+		got := hex.EncodeToString(sum[:])
+		return subtle.ConstantTimeCompare([]byte(r.OwnerTokenHash), []byte(got)) == 1
+	}
+	return false
 }
 
-// claimOwner binds this session as owner when token matches, or (legacy)
-// when the room has no token yet — first successful claim after upgrade.
+// claimOwner binds this session as owner when token matches.
+// Empty-token first-claimer reclaim is refused (fail closed).
 func (r *Room) claimOwner(c *Client, token string) (isOwner bool, issuedToken string) {
 	if r == nil || c == nil {
 		return false, ""
 	}
 	if r.validOwnerToken(token) {
 		r.OwnerID = c.ID
-		return true, r.OwnerToken
-	}
-	if r.OwnerToken == "" {
-		r.OwnerToken = newOwnerToken()
-		r.OwnerID = c.ID
+		if r.OwnerToken == "" && token != "" {
+			r.OwnerToken = token
+		}
 		return true, r.OwnerToken
 	}
 	if r.isOwner(c) {
@@ -138,8 +149,19 @@ func verifyPassword(stored, password string) bool {
 
 func newRelayToken() string {
 	b := make([]byte, 24)
-	rand.Read(b)
+	if _, err := rand.Read(b); err != nil {
+		log.Printf("newRelayToken: rand.Read failed: %v", err)
+		return ""
+	}
 	return hex.EncodeToString(b)
+}
+
+func ownerTokenHash(token string) string {
+	if token == "" {
+		return ""
+	}
+	sum := sha256.Sum256([]byte(token))
+	return hex.EncodeToString(sum[:])
 }
 
 func (r *Room) Broadcast(msg Message) {
@@ -148,9 +170,18 @@ func (r *Room) Broadcast(msg Message) {
 		log.Printf("Room.Broadcast marshal error: %v", err)
 		return
 	}
+	critical := isCriticalSignaling(msg.Type)
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 	for _, c := range r.Clients {
+		if critical {
+			select {
+			case c.Send <- data:
+			case <-time.After(2 * time.Second):
+				log.Printf("Room.Broadcast: critical %s drop after timeout for %s", msg.Type, c.ID)
+			}
+			continue
+		}
 		select {
 		case c.Send <- data:
 		default:
@@ -164,15 +195,35 @@ func (r *Room) BroadcastExcept(exclude *Client, msg Message) {
 		log.Printf("Room.BroadcastExcept marshal error: %v", err)
 		return
 	}
+	critical := isCriticalSignaling(msg.Type)
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 	for _, c := range r.Clients {
-		if c != exclude {
+		if c == exclude {
+			continue
+		}
+		if critical {
 			select {
 			case c.Send <- data:
-			default:
+			case <-time.After(2 * time.Second):
+				log.Printf("Room.BroadcastExcept: critical %s drop after timeout for %s", msg.Type, c.ID)
 			}
+			continue
 		}
+		select {
+		case c.Send <- data:
+		default:
+		}
+	}
+}
+
+func isCriticalSignaling(t string) bool {
+	switch t {
+	case "auth_ok", "auth_fail", "room_joined", "room_error", "room_deleted",
+		"peer_joined", "peer_left", "peer_updated", "error":
+		return true
+	default:
+		return false
 	}
 }
 
@@ -214,7 +265,7 @@ func (h *Hub) issueRelayToken(client *Client, vip string) string {
 	return token
 }
 
-func (h *Hub) ValidateRelayReg(token, vip string) bool {
+func (h *Hub) ValidateRelayReg(token, vip, remote string) bool {
 	if token == "" || vip == "" {
 		return false
 	}
@@ -229,6 +280,11 @@ func (h *Hub) ValidateRelayReg(token, vip string) bool {
 		return false
 	}
 	if e.VirtualIP != vip {
+		return false
+	}
+	if e.BoundUDP == "" {
+		e.BoundUDP = remote
+	} else if remote != "" && e.BoundUDP != remote {
 		return false
 	}
 	// refresh on successful use
@@ -489,6 +545,9 @@ func (h *Hub) DeleteRoom(name, ownerToken string, requester *Client) {
 }
 
 func roomsPath() string {
+	if d := os.Getenv("ENTANGLED_DATA_DIR"); d != "" {
+		return filepath.Join(d, "rooms.json")
+	}
 	return "rooms.json"
 }
 
@@ -497,13 +556,18 @@ func (h *Hub) SaveRooms() {
 	defer h.mu.Unlock()
 	rooms := make(map[string]StoredRoom)
 	for name, room := range h.Rooms {
+		hash := room.OwnerTokenHash
+		if hash == "" && room.OwnerToken != "" {
+			hash = ownerTokenHash(room.OwnerToken)
+			room.OwnerTokenHash = hash
+		}
 		rooms[name] = StoredRoom{
-			Name:         room.Name,
-			PasswordHash: room.PasswordHash,
-			CreatedAt:    room.CreatedAt,
-			OwnerID:      room.OwnerID,
-			OwnerToken:   room.OwnerToken,
-			OwnerPubKey:  room.OwnerPubKey,
+			Name:           room.Name,
+			PasswordHash:   room.PasswordHash,
+			CreatedAt:      room.CreatedAt,
+			OwnerID:        room.OwnerID,
+			OwnerTokenHash: hash,
+			OwnerPubKey:    room.OwnerPubKey,
 		}
 	}
 	data, err := json.MarshalIndent(rooms, "", "  ")
@@ -511,10 +575,18 @@ func (h *Hub) SaveRooms() {
 		log.Printf("failed to marshal rooms: %v", err)
 		return
 	}
-	if err := os.WriteFile(roomsPath(), data, 0600); err != nil {
+	path := roomsPath()
+	tmp := path + ".tmp"
+	if err := os.WriteFile(tmp, data, 0600); err != nil {
 		log.Printf("failed to save rooms: %v", err)
+		return
 	}
-	log.Printf("saved %d rooms to %s", len(rooms), roomsPath())
+	if err := os.Rename(tmp, path); err != nil {
+		log.Printf("failed to rename rooms: %v", err)
+		_ = os.Remove(tmp)
+		return
+	}
+	log.Printf("saved %d rooms to %s", len(rooms), path)
 }
 
 func (h *Hub) LoadRooms() {
@@ -546,14 +618,21 @@ func (h *Hub) LoadRooms() {
 			hash = h2
 			migrated = true
 		}
+		tokenHash := sr.OwnerTokenHash
+		ownerToken := ""
+		if tokenHash == "" && sr.OwnerToken != "" {
+			tokenHash = ownerTokenHash(sr.OwnerToken)
+			migrated = true
+		}
 		h.Rooms[name] = &Room{
-			Name:         sr.Name,
-			PasswordHash: hash,
-			OwnerID:      sr.OwnerID,
-			OwnerToken:   sr.OwnerToken,
-			OwnerPubKey:  sr.OwnerPubKey,
-			CreatedAt:    sr.CreatedAt,
-			Clients:      make(map[string]*Client),
+			Name:           sr.Name,
+			PasswordHash:   hash,
+			OwnerID:        sr.OwnerID,
+			OwnerToken:     ownerToken,
+			OwnerTokenHash: tokenHash,
+			OwnerPubKey:    sr.OwnerPubKey,
+			CreatedAt:      sr.CreatedAt,
+			Clients:        make(map[string]*Client),
 		}
 	}
 	log.Printf("loaded %d rooms from %s", len(stored), roomsPath())

@@ -43,7 +43,7 @@ func NewRelay() *Relay {
 // parseRelayReg accepts tokenized REG only:
 //
 //	[magic:4][type:1][token_len:1][token][vip]
-func (r *Relay) parseRelayReg(pkt []byte) (vip string, ok bool) {
+func (r *Relay) parseRelayReg(pkt []byte, remote string) (vip string, ok bool) {
 	n := len(pkt)
 	if n < 6 {
 		return "", false
@@ -59,8 +59,8 @@ func (r *Relay) parseRelayReg(pkt []byte) (vip string, ok bool) {
 		log.Printf("Relay REG rejected (unparseable vip)")
 		return "", false
 	}
-	if r.Hub == nil || !r.Hub.ValidateRelayReg(token, cand) {
-		log.Printf("Relay REG rejected for vip=%s (bad/expired token)", cand)
+	if r.Hub == nil || !r.Hub.ValidateRelayReg(token, cand, remote) {
+		log.Printf("Relay REG rejected for vip=%s (bad/expired token or UDP bind mismatch)", cand)
 		return "", false
 	}
 	return cand, true
@@ -139,7 +139,7 @@ func (r *Relay) readLoop() {
 
 		switch msgType {
 		case relayTypeReg:
-			vip, ok := r.parseRelayReg(buf[:n])
+			vip, ok := r.parseRelayReg(buf[:n], addr.String())
 			if !ok || vip == "" {
 				continue
 			}

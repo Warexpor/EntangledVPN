@@ -199,9 +199,40 @@ func (a *App) writeRooms(rooms []SavedRoomEntry) {
 		vpncore.Logger.Printf("SaveRoom: marshal error: %v", err)
 		return
 	}
-	if err := os.WriteFile(roomsPath(), data, 0600); err != nil {
+	if err := writeFileAtomic(roomsPath(), data, 0600); err != nil {
 		vpncore.Logger.Printf("SaveRoom: write error: %v", err)
 	}
+}
+
+func writeFileAtomic(path string, data []byte, perm os.FileMode) error {
+	dir := filepath.Dir(path)
+	tmp, err := os.CreateTemp(dir, ".entangled-tmp-*")
+	if err != nil {
+		return err
+	}
+	tmpName := tmp.Name()
+	ok := false
+	defer func() {
+		if !ok {
+			_ = os.Remove(tmpName)
+		}
+	}()
+	if _, err := tmp.Write(data); err != nil {
+		tmp.Close()
+		return err
+	}
+	if err := tmp.Chmod(perm); err != nil {
+		tmp.Close()
+		return err
+	}
+	if err := tmp.Close(); err != nil {
+		return err
+	}
+	if err := os.Rename(tmpName, path); err != nil {
+		return err
+	}
+	ok = true
+	return nil
 }
 
 func (a *App) RemoveSavedRoom(name string) {
@@ -266,10 +297,13 @@ func (a *App) GetVersion() string {
 }
 
 func (a *App) GetStatus() AppStatus {
-	if a.vpn == nil {
+	a.mu.Lock()
+	vpn := a.vpn
+	a.mu.Unlock()
+	if vpn == nil {
 		return AppStatus{}
 	}
-	s := a.vpn.GetStatus()
+	s := vpn.GetStatus()
 	return statusFrom(s)
 }
 
@@ -335,7 +369,7 @@ func (a *App) SaveConfig(cfg ClientConfig) {
 		vpncore.Logger.Printf("SaveConfig: marshal error: %v", err)
 		return
 	}
-	if err := os.WriteFile(configPath(), data, 0600); err != nil {
+	if err := writeFileAtomic(configPath(), data, 0600); err != nil {
 		vpncore.Logger.Printf("SaveConfig: write error: %v", err)
 	}
 }
@@ -393,7 +427,7 @@ func (a *App) SetStartWithWindows(enabled bool) {
 			"HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Run",
 			"/v", "EntangledVPN",
 			"/t", "REG_SZ",
-			"/d", exePath,
+			"/d", `"`+exePath+`"`,
 			"/f",
 		)
 		if out, err := cmd.CombinedOutput(); err != nil {
@@ -557,6 +591,14 @@ func (a *App) wireVPN(vpn *vpncore.VPNCore) {
 	vpn.OnOwnerToken = func(room, token string) {
 		a.saveOwnerToken(room, token)
 	}
+	vpn.OnRoomJoined = func(room, password string) {
+		a.lastRoomName = room
+		if password != "" {
+			a.lastRoomPass = password
+		}
+		a.SaveRoom(room, a.lastRoomPass)
+		a.persistLastRoom(room, a.lastRoomPass != "")
+	}
 }
 
 func (a *App) Disconnect() {
@@ -582,14 +624,10 @@ func (a *App) CreateRoom(name, password string) error {
 	if vpn == nil {
 		return fmt.Errorf("not connected")
 	}
-	if err := vpn.CreateRoom(name, password); err != nil {
-		return err
-	}
 	a.lastRoomName = name
 	a.lastRoomPass = password
-	a.SaveRoom(name, password)
-	a.persistLastRoom(name, password != "")
-	return nil
+	// Persist only after server room_joined (OnRoomJoined).
+	return vpn.CreateRoom(name, password)
 }
 
 func (a *App) JoinRoom(name, password string) error {
@@ -602,14 +640,9 @@ func (a *App) JoinRoom(name, password string) error {
 	if vpn == nil {
 		return fmt.Errorf("not connected")
 	}
-	if err := vpn.JoinRoom(name, password); err != nil {
-		return err
-	}
 	a.lastRoomName = name
 	a.lastRoomPass = password
-	a.SaveRoom(name, password)
-	a.persistLastRoom(name, password != "")
-	return nil
+	return vpn.JoinRoom(name, password)
 }
 
 func (a *App) LeaveRoom() {
@@ -638,10 +671,13 @@ func (a *App) DeleteRoom(name string) error {
 }
 
 func (a *App) GetPeers() []PeerInfo {
-	if a.vpn == nil {
+	a.mu.Lock()
+	vpn := a.vpn
+	a.mu.Unlock()
+	if vpn == nil {
 		return nil
 	}
-	peers := a.vpn.GetPeers()
+	peers := vpn.GetPeers()
 	info := make([]PeerInfo, len(peers))
 	for i, p := range peers {
 		id, nick, vip, conn, ping, path := p.Snapshot()
@@ -659,29 +695,32 @@ func (a *App) GetPeers() []PeerInfo {
 
 func (a *App) SendChat(toID, message string) error {
 	a.mu.Lock()
-	defer a.mu.Unlock()
-	if a.vpn == nil {
+	vpn := a.vpn
+	a.mu.Unlock()
+	if vpn == nil {
 		return fmt.Errorf("not connected")
 	}
-	return a.vpn.SendChat(toID, message)
+	return vpn.SendChat(toID, message)
 }
 
 func (a *App) BroadcastChat(message string) error {
 	a.mu.Lock()
-	defer a.mu.Unlock()
-	if a.vpn == nil {
+	vpn := a.vpn
+	a.mu.Unlock()
+	if vpn == nil {
 		return fmt.Errorf("not connected")
 	}
-	return a.vpn.BroadcastChat(message)
+	return vpn.BroadcastChat(message)
 }
 
 func (a *App) PingPeer(peerID string) error {
 	a.mu.Lock()
-	defer a.mu.Unlock()
-	if a.vpn == nil {
+	vpn := a.vpn
+	a.mu.Unlock()
+	if vpn == nil {
 		return fmt.Errorf("not connected")
 	}
-	return a.vpn.PingPeer(peerID)
+	return vpn.PingPeer(peerID)
 }
 
 func (a *App) CopyText(text string) {
@@ -690,13 +729,11 @@ func (a *App) CopyText(text string) {
 	}
 }
 
-// FormatInvite returns server|room|password for sharing.
+// FormatInvite returns server|room (password omitted — share out-of-band).
 func (a *App) FormatInvite(room, password string) string {
 	cfg := a.LoadConfig()
-	if password == "" && room == a.lastRoomName {
-		password = a.lastRoomPass
-	}
-	return cfg.ServerAddr + "|" + room + "|" + password
+	_ = password
+	return cfg.ServerAddr + "|" + room
 }
 
 // ParseInvite parses server|room|password (password may be empty).

@@ -100,7 +100,8 @@ func (s *SignalingClient) logf(format string, args ...interface{}) {
 }
 
 // normalizeWSAddr picks ws/wss and a bare host[:port].
-// https://host:8080 → ws (plain servers; browser URL habit). Explicit wss:// always TLS.
+// https:// always maps to wss (no silent cleartext downgrade on non-443).
+// Plain servers: use host:port, http://, or explicit ws://.
 func normalizeWSAddr(serverAddr string) (scheme, host string) {
 	raw := strings.TrimSpace(serverAddr)
 	lower := strings.ToLower(raw)
@@ -130,14 +131,10 @@ func normalizeWSAddr(serverAddr string) (scheme, host string) {
 
 	scheme = "ws"
 	switch {
-	case hadWSS:
+	case hadWSS, hadHTTPS:
 		scheme = "wss"
 	case hadWS, hadHTTP:
 		scheme = "ws"
-	case hadHTTPS:
-		if !hasPort || port == "443" {
-			scheme = "wss"
-		}
 	case hasPort && port == "443":
 		scheme = "wss"
 	}
@@ -416,6 +413,19 @@ func (s *SignalingClient) Close() {
 	s.mu.Lock()
 	s.intentional = true
 	s.mu.Unlock()
+	s.closeConn()
+}
+
+// CloseAttempt aborts a dial/auth try without marking intentional disconnect
+// (reconnectLoop must keep retrying without tearing TUN down).
+func (s *SignalingClient) CloseAttempt() {
+	s.mu.Lock()
+	s.intentional = false
+	s.mu.Unlock()
+	s.closeConn()
+}
+
+func (s *SignalingClient) closeConn() {
 	s.closeOnce.Do(func() {
 		close(s.done)
 		s.mu.Lock()

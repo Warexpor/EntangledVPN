@@ -7,14 +7,14 @@ func TestNormalizeWSAddr(t *testing.T) {
 		in, scheme, host string
 	}{
 		{"192.0.2.10:8080", "ws", "192.0.2.10:8080"},
-		{"https://192.0.2.10:8080", "ws", "192.0.2.10:8080"},
+		{"https://192.0.2.10:8080", "wss", "192.0.2.10:8080"},
 		{"http://192.0.2.10:8080", "ws", "192.0.2.10:8080"},
 		{"ws://192.0.2.10:8080", "ws", "192.0.2.10:8080"},
 		{"wss://example.com", "wss", "example.com"},
 		{"https://example.com", "wss", "example.com"},
 		{"https://example.com:443", "wss", "example.com:443"},
 		{"example.com:443", "wss", "example.com:443"},
-		{"https://host:8080/path", "ws", "host:8080"},
+		{"https://host:8080/path", "wss", "host:8080"},
 	}
 	for _, c := range cases {
 		scheme, host := normalizeWSAddr(c.in)

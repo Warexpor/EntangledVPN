@@ -2,10 +2,27 @@
 
 ## Unreleased
 
-### Added
+## 1.4.1 — 2026-09-17
 
-- GitHub Actions **Release** workflow: builds `Entangled.exe` (Wails), Windows Electron NSIS installer, Linux AppImage, and server binaries
-- Windows Electron NSIS setup (`EntangledVPN-Setup-*-x64.exe`) with `requireAdministrator`
+### Security
+
+- Windows in-app update requires `Entangled.exe.sha256` and verifies SHA-256 before swap
+- Electron: Chromium sandbox enabled; Linux installer no longer passes `--no-sandbox`
+- Electron Linux sidecar: SHA-256 integrity check before `setcap`
+- Server setup generates/requires `ENTANGLED_TOKEN` by default (`ENTANGLED_ALLOW_OPEN_JOIN=1` for explicit open join)
+- Rooms persist owner token hashes only; empty-token owner reclaim refused
+- Relay REG binds to first UDP address for the token; WS read limit + relay_data size cap
+- Client logs use mode `0600`; invite strings omit room passwords
+
+### Fixed
+
+- Leave/rejoin UDP hang (`PeerManager.Stop` closes conn; listener stopped on leave)
+- Create/Join persist only after `room_joined`
+- Connect waits for auth before ready; reconnect auth abort is non-intentional
+- `https://` no longer silently downgrades to cleartext `ws://` on non-443
+- Critical signaling no longer silently dropped on full send buffers
+- TUN setup runs off the WebSocket read path
+- Atomic config/rooms writes; Windows Run key path quoted; P2P match by full UDP address
 
 ## 1.4.0 — 2026-09-10
 

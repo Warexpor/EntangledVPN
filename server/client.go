@@ -53,6 +53,7 @@ func (c *Client) ReadPump() {
 		c.Hub.Unregister <- c
 		c.Conn.Close()
 	}()
+	c.Conn.SetReadLimit(1 << 20) // 1 MiB max frame
 
 	for {
 		_, msg, err := c.Conn.ReadMessage()
@@ -254,6 +255,10 @@ func (c *Client) handleMessage(raw []byte) {
 		}
 		if err := json.Unmarshal(msg.Payload, &p); err != nil || p.To == "" || p.D == "" {
 			c.sendError("invalid relay_data payload")
+			return
+		}
+		if len(p.D) > 256*1024 {
+			c.sendError("relay_data too large")
 			return
 		}
 		c.mu.RLock()

@@ -62,6 +62,7 @@ type VPNCore struct {
 	OnSystemChat   func(text string)
 	OnRoomDeleted  func(name string)
 	OnOwnerToken   func(room, token string) // persist capability token locally
+	OnRoomJoined   func(room, password string) // confirmed join — persist last-room / saved network
 }
 
 func (v *VPNCore) log(format string, args ...interface{}) {
@@ -155,6 +156,25 @@ func (v *VPNCore) Start() error {
 		v.updateStatus()
 		v.Stop()
 		return err
+	}
+
+	// Wait for auth (same timeout as reconnectLoop) before advertising Connected.
+	v.mu.Lock()
+	authOK := v.authOK
+	v.mu.Unlock()
+	if authOK != nil {
+		select {
+		case <-authOK:
+		case <-time.After(15 * time.Second):
+			v.log("Start auth timeout")
+			v.closeSignalingAttempt()
+			v.mu.Lock()
+			v.status.Phase = "error"
+			v.mu.Unlock()
+			v.updateStatus()
+			v.Stop()
+			return fmt.Errorf("authentication timed out")
+		}
 	}
 
 	v.mu.Lock()
@@ -270,41 +290,16 @@ func (v *VPNCore) wireSignalingHandlers(signaling *SignalingClient) {
 		}
 		v.updatePeers()
 
-		if err := v.tun.Start(virtualIP); err != nil {
-			v.log("TUN start error: %v", err)
-			if v.OnError != nil {
-				v.OnError(tunStartErrorHint(err))
-			}
+		pass := ""
+		v.mu.Lock()
+		if v.lastRoomName == room {
+			pass = v.lastRoomPass
 		} else {
-			v.log("TUN adapter started")
-			v.router = NewPacketRouter(virtualIP, v.peers)
-			v.router.OnLog = v.log
-			v.tun.OnPacket = func(data []byte) {
-				v.router.HandleTUNPacket(data)
-			}
-			v.peers.OnPacket = func(fromID string, data []byte) {
-				v.router.HandlePeerPacket(fromID, data)
-			}
-			v.peers.OnChat = func(fromID, nickname, message string, isDM bool) {
-				if v.OnChat != nil {
-					v.OnChat(fromID, nickname, message, isDM)
-				}
-			}
-			v.router.OnSendToTUN = func(data []byte) {
-				v.tun.Write(data)
-			}
-			v.router.OnAddRoute = func(peerIP string) {
-				v.tun.AddRoute(peerIP)
-			}
-
-			for _, p := range v.peers.GetPeers() {
-				p.mu.Lock()
-				vip := p.VirtualIP
-				p.mu.Unlock()
-				if vip != "" {
-					v.router.AddRoute(vip)
-				}
-			}
+			v.lastRoomName = room
+		}
+		v.mu.Unlock()
+		if v.OnRoomJoined != nil {
+			v.OnRoomJoined(room, pass)
 		}
 
 		v.peers.SendWSRelay = func(toID string, data []byte) error {
@@ -325,6 +320,9 @@ func (v *VPNCore) wireSignalingHandlers(signaling *SignalingClient) {
 		signaling.OnRelayData = func(fromID string, data []byte) {
 			v.peers.HandleRelayPacket(data)
 		}
+
+		// TUN setup off the WS read path so signaling stays responsive (B-16).
+		go v.setupTUNAfterJoin(virtualIP)
 	}
 
 	signaling.OnRoomDeleted = func(name string) {
@@ -534,10 +532,11 @@ func (v *VPNCore) reconnectLoop(gen int, room, pass string) {
 }
 
 func (v *VPNCore) cleanupRoomLocal() {
-	if v.tun != nil {
-		v.tun.Close()
-	}
 	v.mu.Lock()
+	if v.listenerConn != nil {
+		_ = v.listenerConn.Close()
+		v.listenerConn = nil
+	}
 	if v.relay != nil {
 		v.relay.Stop()
 		v.relay = nil
@@ -549,6 +548,10 @@ func (v *VPNCore) cleanupRoomLocal() {
 	v.lastRoomName = ""
 	v.lastRoomPass = ""
 	v.mu.Unlock()
+	if v.tun != nil {
+		v.tun.Close()
+	}
+	v.peers.Stop()
 	v.peers.Clear()
 	v.updateStatus()
 	v.updatePeers()
@@ -584,7 +587,49 @@ func (v *VPNCore) closeSignalingAttempt() {
 	v.signaling = nil
 	v.mu.Unlock()
 	if sig != nil {
-		sig.Close()
+		sig.CloseAttempt()
+	}
+}
+
+func (v *VPNCore) setupTUNAfterJoin(virtualIP string) {
+	if v.tun == nil {
+		return
+	}
+	if err := v.tun.Start(virtualIP); err != nil {
+		v.log("TUN start error: %v", err)
+		if v.OnError != nil {
+			v.OnError(tunStartErrorHint(err))
+		}
+		return
+	}
+	v.log("TUN adapter started")
+	v.router = NewPacketRouter(virtualIP, v.peers)
+	v.router.OnLog = v.log
+	v.tun.OnPacket = func(data []byte) {
+		v.router.HandleTUNPacket(data)
+	}
+	v.peers.OnPacket = func(fromID string, data []byte) {
+		v.router.HandlePeerPacket(fromID, data)
+	}
+	v.peers.OnChat = func(fromID, nickname, message string, isDM bool) {
+		if v.OnChat != nil {
+			v.OnChat(fromID, nickname, message, isDM)
+		}
+	}
+	v.router.OnSendToTUN = func(data []byte) {
+		v.tun.Write(data)
+	}
+	v.router.OnAddRoute = func(peerIP string) {
+		v.tun.AddRoute(peerIP)
+	}
+
+	for _, p := range v.peers.GetPeers() {
+		p.mu.Lock()
+		vip := p.VirtualIP
+		p.mu.Unlock()
+		if vip != "" {
+			v.router.AddRoute(vip)
+		}
 	}
 }
 
@@ -647,8 +692,8 @@ func (v *VPNCore) CreateRoom(name, password string) error {
 	if v.signaling == nil {
 		return fmt.Errorf("not connected")
 	}
+	// Remember password for confirmed-join callback; do not treat as joined yet.
 	v.mu.Lock()
-	v.lastRoomName = name
 	v.lastRoomPass = password
 	v.mu.Unlock()
 	v.peers.Clear()
@@ -662,7 +707,6 @@ func (v *VPNCore) JoinRoom(name, password string) error {
 		return fmt.Errorf("not connected")
 	}
 	v.mu.Lock()
-	v.lastRoomName = name
 	v.lastRoomPass = password
 	tok := v.ownerTokenLocked(name)
 	v.mu.Unlock()
@@ -721,13 +765,14 @@ func (v *VPNCore) startPeerListener() {
 	v.listenerMu.Lock()
 	defer v.listenerMu.Unlock()
 
-	v.peers.Stop()
+	// Close UDP before Stop so reader can exit (B-04).
 	v.mu.Lock()
 	if v.listenerConn != nil {
-		v.listenerConn.Close()
+		_ = v.listenerConn.Close()
 		v.listenerConn = nil
 	}
 	v.mu.Unlock()
+	v.peers.Stop()
 
 	addr, _ := net.ResolveUDPAddr("udp4", ":0")
 	conn, err := net.ListenUDP("udp4", addr)
