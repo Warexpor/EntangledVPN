@@ -1,6 +1,6 @@
 {
   "name": "entangledvpn-electron",
-  "version": "1.4.0",
+  "version": "1.4.1",
   "private": true,
   "description": "Entangled VPN — Electron shell (Linux primary; Windows optional)",
   "main": "main.mjs",

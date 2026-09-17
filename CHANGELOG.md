@@ -4,6 +4,10 @@
 
 ## 1.4.1 — 2026-09-17
 
+### Changed
+
+- Electron `package.json` version set to **1.4.1** so AppImage/NSIS artifact names match the release tag
+
 ### Security
 
 - Windows in-app update requires `Entangled.exe.sha256` and verifies SHA-256 before swap
